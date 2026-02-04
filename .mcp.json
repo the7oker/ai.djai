@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@pgedge/mcp-server-postgres",
+        "--connection-string",
+        "postgresql://musicai:supervisor@localhost:5432/music_ai"
+      ]
+    }
+  }
+}
