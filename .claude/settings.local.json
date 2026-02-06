@@ -17,7 +17,12 @@
       "Bash(PGPASSWORD=supervisor psql:*)",
       "Bash(node --version)",
       "Bash(npx --version)",
-      "Bash(docker-compose restart:*)"
+      "Bash(docker-compose restart:*)",
+      "Bash(docker cp:*)"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "postgres"
+  ]
 }
