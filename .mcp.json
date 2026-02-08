@@ -2,12 +2,22 @@
   "mcpServers": {
     "postgres": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@pgedge/mcp-server-postgres",
-        "--connection-string",
-        "postgresql://musicai:supervisor@localhost:5432/music_ai"
-      ]
+      "args": ["-y", "postgres-mcp-server"],
+      "env": {
+        "DB_HOST": "127.0.0.1",
+        "DB_PORT": "5432",
+        "DB_USER": "musicai",
+        "DB_PASSWORD": "supervisor",
+        "DB_NAME": "music_ai",
+        "DB_SSL": "false"
+      }
+    },
+    "mcp-omnisearch": {
+      "command": "npx",
+      "args": ["-y", "mcp-omnisearch"],
+      "env": {
+        "TAVILY_API_KEY": "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"
+      }
     }
   }
 }

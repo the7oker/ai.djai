@@ -18,7 +18,18 @@
       "Bash(node --version)",
       "Bash(npx --version)",
       "Bash(docker-compose restart:*)",
-      "Bash(docker cp:*)"
+      "Bash(docker cp:*)",
+      "Bash(mount:*)",
+      "Bash(find:*)",
+      "Bash(docker compose restart:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker ps:*)",
+      "Bash(timeout 5 npx:*)",
+      "WebSearch",
+      "mcp__postgres__list_tables",
+      "mcp__postgres__query",
+      "mcp__postgres__describe_table",
+      "WebFetch(domain:github.com)"
     ]
   },
   "enableAllProjectMcpServers": true,
