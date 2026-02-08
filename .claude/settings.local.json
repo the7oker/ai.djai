@@ -29,7 +29,10 @@
       "mcp__postgres__list_tables",
       "mcp__postgres__query",
       "mcp__postgres__describe_table",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(grep:*)",
+      "Bash(pip index versions:*)",
+      "Bash(pip install:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
