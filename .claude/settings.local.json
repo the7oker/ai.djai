@@ -32,7 +32,8 @@
       "WebFetch(domain:github.com)",
       "Bash(grep:*)",
       "Bash(pip index versions:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(tee:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
