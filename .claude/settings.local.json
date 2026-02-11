@@ -33,7 +33,12 @@
       "Bash(grep:*)",
       "Bash(pip index versions:*)",
       "Bash(pip install:*)",
-      "Bash(tee:*)"
+      "Bash(tee:*)",
+      "WebFetch(domain:essentia.upf.edu)",
+      "WebFetch(domain:mtg.github.io)",
+      "Bash(docker image:*)",
+      "WebFetch(domain:librosa.org)",
+      "WebFetch(domain:arxiv.org)"
     ]
   },
   "enableAllProjectMcpServers": true,
