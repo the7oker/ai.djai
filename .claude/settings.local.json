@@ -38,7 +38,10 @@
       "WebFetch(domain:mtg.github.io)",
       "Bash(docker image:*)",
       "WebFetch(domain:librosa.org)",
-      "WebFetch(domain:arxiv.org)"
+      "WebFetch(domain:arxiv.org)",
+      "Bash(python -c:*)",
+      "Bash(python:*)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''backend/text_embeddings.py''\\).read\\(\\)\\); print\\(''text_embeddings.py: OK''\\)\")"
     ]
   },
   "enableAllProjectMcpServers": true,
