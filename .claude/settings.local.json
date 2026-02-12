@@ -55,7 +55,10 @@
       "Bash(docker start:*)",
       "Bash(docker restart:*)",
       "Bash(nc:*)",
-      "Bash(ip route:*)"
+      "Bash(ip route:*)",
+      "Bash(sudo apt-get:*)",
+      "Bash(sudo apt-get install:*)",
+      "Bash(pip3 install:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
