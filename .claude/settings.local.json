@@ -48,7 +48,9 @@
       "Bash(powershell.exe -c \"Test-Path ''E:\\\\Music''\")",
       "Bash(powershell.exe -c \"Get-ChildItem ''E:\\\\Music'' | Select-Object -First 5 Name\")",
       "Bash(powershell.exe -c \"Get-Volume | Where-Object {$_DriveLetter -eq ''E''} | Format-List\")",
-      "Bash(powershell.exe -c \"Get-Volume -DriveLetter E\")"
+      "Bash(powershell.exe -c \"Get-Volume -DriveLetter E\")",
+      "Bash(ls:*)",
+      "Bash(docker-compose build:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
