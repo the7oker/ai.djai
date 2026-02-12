@@ -41,7 +41,14 @@
       "WebFetch(domain:arxiv.org)",
       "Bash(python -c:*)",
       "Bash(python:*)",
-      "Bash(python -c \"import ast; ast.parse\\(open\\(''backend/text_embeddings.py''\\).read\\(\\)\\); print\\(''text_embeddings.py: OK''\\)\")"
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''backend/text_embeddings.py''\\).read\\(\\)\\); print\\(''text_embeddings.py: OK''\\)\")",
+      "Bash(powershell.exe -c \"Get-PSDrive E\")",
+      "Bash(sudo mkdir:*)",
+      "Bash(sudo mount:*)",
+      "Bash(powershell.exe -c \"Test-Path ''E:\\\\Music''\")",
+      "Bash(powershell.exe -c \"Get-ChildItem ''E:\\\\Music'' | Select-Object -First 5 Name\")",
+      "Bash(powershell.exe -c \"Get-Volume | Where-Object {$_DriveLetter -eq ''E''} | Format-List\")",
+      "Bash(powershell.exe -c \"Get-Volume -DriveLetter E\")"
     ]
   },
   "enableAllProjectMcpServers": true,
