@@ -18,6 +18,21 @@
       "env": {
         "TAVILY_API_KEY": "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"
       }
+    },
+    "hqplayer": {
+      "command": "uv",
+      "args": ["run", "--directory", "/mnt/d/ai/djai/mcp", "hqplayer_server.py"],
+      "env": {
+        "DB_HOST": "127.0.0.1",
+        "DB_PORT": "5432",
+        "DB_USER": "musicai",
+        "DB_PASSWORD": "supervisor",
+        "DB_NAME": "music_ai",
+        "HQPLAYER_HOST": "172.26.80.1",
+        "HQPLAYER_PORT": "4321",
+        "MUSIC_WINDOWS_PATH": "E:/Music",
+        "BACKEND_URL": "http://localhost:8000"
+      }
     }
   }
 }

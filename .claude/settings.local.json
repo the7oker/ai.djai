@@ -58,7 +58,18 @@
       "Bash(ip route:*)",
       "Bash(sudo apt-get:*)",
       "Bash(sudo apt-get install:*)",
-      "Bash(pip3 install:*)"
+      "Bash(pip3 install:*)",
+      "WebFetch(domain:gofastmcp.com)",
+      "WebFetch(domain:support.claude.com)",
+      "Bash(uv run python:*)",
+      "mcp__hqplayer__hqplayer_get_settings",
+      "mcp__hqplayer__hqplayer_set_filter",
+      "mcp__hqplayer__hqplayer_get_status",
+      "mcp__hqplayer__search_tracks",
+      "mcp__hqplayer__search_similar",
+      "mcp__hqplayer__play_track",
+      "mcp__hqplayer__hqplayer_play",
+      "mcp__hqplayer__hqplayer_next"
     ]
   },
   "enableAllProjectMcpServers": true,
