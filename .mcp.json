@@ -31,7 +31,8 @@
         "HQPLAYER_HOST": "172.26.80.1",
         "HQPLAYER_PORT": "4321",
         "MUSIC_WINDOWS_PATH": "E:/Music",
-        "BACKEND_URL": "http://localhost:8000"
+        "BACKEND_URL": "http://localhost:8000",
+        "TRACKER_URL": "http://localhost:8765"
       }
     }
   }

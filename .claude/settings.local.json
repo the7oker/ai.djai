@@ -69,7 +69,12 @@
       "mcp__hqplayer__search_similar",
       "mcp__hqplayer__play_track",
       "mcp__hqplayer__hqplayer_play",
-      "mcp__hqplayer__hqplayer_next"
+      "mcp__hqplayer__hqplayer_next",
+      "Bash(chmod:*)",
+      "mcp__hqplayer__search_semantic",
+      "mcp__hqplayer__add_to_queue",
+      "mcp__hqplayer__hqplayer_stop",
+      "mcp__hqplayer__play_album"
     ]
   },
   "enableAllProjectMcpServers": true,
