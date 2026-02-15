@@ -74,7 +74,11 @@
       "mcp__hqplayer__search_semantic",
       "mcp__hqplayer__add_to_queue",
       "mcp__hqplayer__hqplayer_stop",
-      "mcp__hqplayer__play_album"
+      "mcp__hqplayer__play_album",
+      "Bash(claude:*)",
+      "Bash(npm --version:*)",
+      "Bash(CLAUDECODE= claude -p 'say hello' --output-format stream-json)",
+      "Bash(CLAUDECODE= claude:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
