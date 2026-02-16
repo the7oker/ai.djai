@@ -2,8 +2,15 @@
   "mcpServers": {
     "postgres": {
       "command": "npx",
-      "args": ["-y", "@anthropic-ai/postgres-mcp-server", "postgresql://musicai:supervisor@postgres:5432/music_ai"],
-      "env": {}
+      "args": ["-y", "postgres-mcp-server"],
+      "env": {
+        "DB_HOST": "postgres",
+        "DB_PORT": "5432",
+        "DB_USER": "musicai",
+        "DB_PASSWORD": "supervisor",
+        "DB_NAME": "music_ai",
+        "DB_SSL": "false"
+      }
     },
     "hqplayer": {
       "command": "python3",

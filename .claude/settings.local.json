@@ -78,7 +78,10 @@
       "Bash(claude:*)",
       "Bash(npm --version:*)",
       "Bash(CLAUDECODE= claude -p 'say hello' --output-format stream-json)",
-      "Bash(CLAUDECODE= claude:*)"
+      "Bash(CLAUDECODE= claude:*)",
+      "Bash(powershell.exe -Command \"Get-Service audiosrv | Select-Object Status, StartType\")",
+      "Bash(powershell.exe -Command \"Get-Process | Where-Object {$_ProcessName -match ''foobar|vlc|spotify|chrome|firefox|musicbee|aimp''} | Select-Object ProcessName, Id -First 10\")",
+      "Bash(powershell.exe -Command \"Get-Process | Where-Object {$_.ProcessName -match ''chrome|firefox|spotify''} | Select-Object ProcessName -First 5\")"
     ]
   },
   "enableAllProjectMcpServers": true,
