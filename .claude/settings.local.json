@@ -88,7 +88,8 @@
       "Bash(git -C /mnt/d/ai/djai show 543f19c:backend/text_embeddings.py)",
       "Bash(git -C /mnt/d/ai/djai show HEAD~1:backend/text_embeddings.py)",
       "Bash(git -C /mnt/d/ai/djai log --all --full-history -- backend/text_embeddings.py)",
-      "Bash(git -C /mnt/d/ai/djai show b32e509:backend/text_embeddings.py)"
+      "Bash(git -C /mnt/d/ai/djai show b32e509:backend/text_embeddings.py)",
+      "Bash(docker history:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
