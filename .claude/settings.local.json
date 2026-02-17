@@ -81,7 +81,14 @@
       "Bash(CLAUDECODE= claude:*)",
       "Bash(powershell.exe -Command \"Get-Service audiosrv | Select-Object Status, StartType\")",
       "Bash(powershell.exe -Command \"Get-Process | Where-Object {$_ProcessName -match ''foobar|vlc|spotify|chrome|firefox|musicbee|aimp''} | Select-Object ProcessName, Id -First 10\")",
-      "Bash(powershell.exe -Command \"Get-Process | Where-Object {$_.ProcessName -match ''chrome|firefox|spotify''} | Select-Object ProcessName -First 5\")"
+      "Bash(powershell.exe -Command \"Get-Process | Where-Object {$_.ProcessName -match ''chrome|firefox|spotify''} | Select-Object ProcessName -First 5\")",
+      "mcp__postgres__get_constraints",
+      "Bash(git -C /mnt/d/ai/djai log --oneline --all)",
+      "Bash(git -C /mnt/d/ai/djai show 543f19c --name-only)",
+      "Bash(git -C /mnt/d/ai/djai show 543f19c:backend/text_embeddings.py)",
+      "Bash(git -C /mnt/d/ai/djai show HEAD~1:backend/text_embeddings.py)",
+      "Bash(git -C /mnt/d/ai/djai log --all --full-history -- backend/text_embeddings.py)",
+      "Bash(git -C /mnt/d/ai/djai show b32e509:backend/text_embeddings.py)"
     ]
   },
   "enableAllProjectMcpServers": true,
