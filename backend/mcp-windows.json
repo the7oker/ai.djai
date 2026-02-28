@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "postgres-mcp-server"],
+      "env": {
+        "DB_HOST": "localhost",
+        "DB_PORT": "5432",
+        "DB_USER": "musicai",
+        "DB_PASSWORD": "changeme",
+        "DB_NAME": "music_ai",
+        "DB_SSL": "false"
+      }
+    }
+  }
+}
