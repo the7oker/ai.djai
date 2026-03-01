@@ -97,7 +97,9 @@
       "Bash(gh auth status:*)",
       "Bash(git remote set-url:*)",
       "Bash(sudo ls -la /run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu-22.04/ 2>/dev/null | head -20)",
-      "Bash(gh repo view --json visibility,owner,name,defaultBranchRef 2>/dev/null || echo \"gh not available or not authenticated\")"
+      "Bash(gh repo view --json visibility,owner,name,defaultBranchRef 2>/dev/null || echo \"gh not available or not authenticated\")",
+      "WebFetch(domain:anaconda.org)",
+      "Bash(gh api repos/andreiramani/pgvector_pgsql_windows/releases/tags/0.8.1_16 --jq '.assets[] | {name, browser_download_url, size}')"
     ]
   },
   "enableAllProjectMcpServers": true,
