@@ -89,7 +89,15 @@
       "Bash(git -C /mnt/d/ai/djai show HEAD~1:backend/text_embeddings.py)",
       "Bash(git -C /mnt/d/ai/djai log --all --full-history -- backend/text_embeddings.py)",
       "Bash(git -C /mnt/d/ai/djai show b32e509:backend/text_embeddings.py)",
-      "Bash(docker history:*)"
+      "Bash(docker history:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(git push:*)",
+      "Bash(gh auth status:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(sudo ls -la /run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu-22.04/ 2>/dev/null | head -20)",
+      "Bash(gh repo view --json visibility,owner,name,defaultBranchRef 2>/dev/null || echo \"gh not available or not authenticated\")"
     ]
   },
   "enableAllProjectMcpServers": true,
