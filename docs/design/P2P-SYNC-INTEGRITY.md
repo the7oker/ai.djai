@@ -1,15 +1,30 @@
 # P2P Sync Integrity — Data-Poisoning Defense
 
-> **Status: DESIGN, not yet built.** Tier 0 (import isolation) is the
-> agreed first implementation step; everything else lands incrementally
-> behind it. **Origin:** poisoning concern raised by Valerii 2026-06-02
-> (verifiable/subjective split, tiers, master-as-cache); expanded
-> 2026-07-03 (signature cost, atomicity, redistribution, Sybil mass-purge,
-> legitimate-material ambiguity → content-addressing; identity certificates
-> for cold-start weight — donations / birth date / proof-of-work; earned
-> karma — dilution economics, timestamp priority, trap jobs; revocation
-> protocol; karma curve, priority-conflict resolution, notary scaling,
-> big-picture lifecycles). Updated 2026-07-05: golden age, weight-degraded
+> **Status: phase 1 SHIPPED (2026-07-05/06), rest is design.** Shipped:
+> per-segment + audio_features author signatures, Merkle batches, Worker
+> `/timestamp` notary; **provenance refactor 2026-07-06** — content-address
+> captured AT ANALYSIS TIME into `analysis_sources` (one row per
+> track × physical material: pcm_hash + chromaprint + duration_seconds +
+> origin local/deezer/youtube; whole owned library backfilled), records
+> link via `analysis_source_id`, segments re-keyed onto `embeddings(id)`
+> so segments/mean/provenance can never diverge; seal-guard DB triggers
+> (payload change without new signature strips the seal — no writer can
+> silently break a sealed record); record payload **v2** adds
+> duration_seconds to the material declaration (cheap no-decode import
+> gate; tamper-evident); tier-3 stream signing live for deezer-lossless
+> sources; **Tier-0 lite on import** — signed/first-hand rows never
+> overwritten by sync, `analysis_sources.imported` excludes synced-in
+> provenance from signing. Still design: signed records on the wire +
+> import verify, segments sync, full Tier 0 (per-node origin, purge),
+> karma/verification fabric. **Origin:** poisoning concern raised by
+> Valerii 2026-06-02 (verifiable/subjective split, tiers,
+> master-as-cache); expanded 2026-07-03 (signature cost, atomicity,
+> redistribution, Sybil mass-purge, legitimate-material ambiguity →
+> content-addressing; identity certificates for cold-start weight —
+> donations / birth date / proof-of-work; earned karma — dilution
+> economics, timestamp priority, trap jobs; revocation protocol; karma
+> curve, priority-conflict resolution, notary scaling, big-picture
+> lifecycles). Updated 2026-07-05: golden age, weight-degraded
 > acceptance replaces hard quarantine, mutable-source caveat, phase-1
 > audio-only signing scope + possession-privacy stop on mass backfill.
 > **Relates to:** `P2P_NETWORK.md` (transport & identity layer this builds
