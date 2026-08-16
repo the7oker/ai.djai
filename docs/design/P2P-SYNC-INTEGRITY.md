@@ -27,6 +27,20 @@
 > lifecycles). Updated 2026-07-05: golden age, weight-degraded
 > acceptance replaces hard quarantine, mutable-source caveat, phase-1
 > audio-only signing scope + possession-privacy stop on mass backfill.
+> **Updated 2026-08-14:** identity-scarcity tier redesigned — Worker =
+> pure notary (PoW cert merges with birth cert), one peer-verified
+> ~2 GB hashcash, T_min ripening, ~2 GB instance-size rule; new
+> admission-gate layer (K/R sampling, gold/silver by-product pool,
+> quorum promotion, audit-on-mismatch); limits go identity-bound,
+> per-IP demoted to WAF backstops — §§ "Proof-of-work certificates",
+> "Admission gate".
+> **Updated 2026-08-16:** defense *strategy* on top of the mechanism —
+> price by similarity (conjunction of unforgeable axes) not ban by
+> attribute; congestion pricing (base × load × sim, PI controller,
+> dormant in calm, free O(1) quote, merged gold-prefiltered round);
+> local standing replaces the friend bit; email-HMAC axis doubling as
+> a succession/ban-transfer engine; Worker-mailbox de-specializes the
+> master; measure-before-arm phasing — § "Defense strategy".
 > **Relates to:** `P2P_NETWORK.md` (transport & identity layer this builds
 > on), `PHANTOM-DISCOVERY.md` (phantom rows sync as hints — same
 > hint+local-verify rule), `desktop/sync_client.py` (the importer this
@@ -502,36 +516,70 @@ the date to the existing email-verification certificate.
   age × clean contribution history over that period — never standalone
   weight.
 
-### Proof-of-work certificates
+### Proof-of-work certificates (redesigned 2026-08-14)
 
-The Worker issues a unique challenge bound to the key —
-`challenge = H(node_pubkey ‖ worker_nonce)` — and signs
-`sign_master(node_pubkey, difficulty, date)` when the solution checks
-out. Raises the cost of mass node creation.
+**The Worker is a pure notary — it verifies no work.** The PoW
+certificate merges with the birth certificate into one type:
+`{pubkey, method: pow|email, issued_at, difficulty, params_version}`
+signed by `TRUSTED_AUTHORITIES`. `method: email` (verified users)
+carries no work requirement; `method: pow` is the anonymous path. The
+2026-07 sketch (Worker-verified 64 MB hashcash, ~1 min of work) is
+superseded: Worker-side verification capped instance memory at the
+128 MB Workers-isolate ceiling, and small instances are exactly what
+GPU farms eat (size rule below). Moving verification to peers removed
+the ceiling and collapsed the planned tiers into one task.
 
-- Challenge binding is mandatory: unbound puzzles can be precomputed or
-  outsourced in bulk.
-- **Memory-hard (Argon2id, already in the stack), not hash-hard:** plain
-  SHA puzzles hand GPU farms a ~1000× edge, and the target audience owns
-  RTX 4090s — so attackers do too. Argon2id narrows the gap to ~1–5×.
-- Construction: find a nonce with `Argon2id(challenge ‖ nonce) < target`
-  at moderate per-call parameters (~64MB / ~100ms). Difficulty is the
-  expected attempt count set by the numeric target (smooth tuning,
-  ~600 attempts ≈ a minute) — never by inflating a single call.
-  Verification costs exactly **one full call** (~100ms): memory-hardness
-  deliberately sacrifices "instant to check"; the asymmetry is
-  ~attempts:1 and one call fits Worker CPU limits.
-- Considered & rejected puzzles: **weakened crypto problems** (factor a
-  small RSA modulus, solve a small-group ECDLP) — elegant, O(1) to
-  verify, and bit-size is a natural difficulty knob (~74-bit ECDLP ≈ a
-  minute on an RTX 4090) — but compute-bound: the gap between an
-  optimized GPU solver and the code bundled with the client is
-  100–1000×, so calibration breaks for a mixed audience and discounts
-  exactly the attacker's farm. **VDFs** prove elapsed *time*, not spent
-  *resources* (a many-core box runs many instances in parallel for
-  cheap) — the wrong primitive for anti-Sybil.
-- Rate-limit issuance on top (N certs per email/IP/day): PoW is a linear
-  barrier, not a wall.
+- **The work:** one hashcash — find a nonce with
+  `SHA256(Argon2id(cert_payload ‖ nonce)) < target` at **~2 GB per
+  instance**; minutes of background mining in the wizard. The
+  challenge is the signed cert payload itself: work cannot start
+  before issuance, so certs cannot be pre-mined ahead of the key.
+- **Peers verify, once, atomically.** First contact with an unknown
+  `method: pow` identity: Ed25519 cert check (µs) → ripening gate
+  `now ≥ issued_at + T_min` (clock-enforced wall-clock floor — the
+  honest replacement for VDF-style sequentiality) → **one** Argon2id
+  call (~5–15 s) under a concurrency semaphore (the device_auth
+  pattern) → cached forever (first-seen). A failed check blacklists
+  the pubkey: a cert holder presenting fake work is hostile by
+  definition.
+- **Instance size is the anti-GPU knob.** Memory-hard work totals in
+  GB·seconds and is shape-independent (call time is welded to memory:
+  ~0.5–2 GB/s per core, so 64 MB ≈ 0.1–0.3 s, 2 GB ≈ 5–15 s — there
+  is no "2 GB spike for 100 ms"), but per-instance footprint decides
+  who runs at full hardware utilization: at 64 MB a desktop CPU is
+  core-limited (8–16 threads) while a 24 GB card runs ~375 instances
+  (20–50× edge); at ≥ RAM/core of commodity hardware (**~2 GB**) both
+  sides are capacity-limited (~12 vs ~4–6 instances, ~1.5–3×). Small
+  instances are reserved for the admission gate, whose job is
+  throttling, not scarcity.
+- **Memory-hard (Argon2id, already in the stack), not hash-hard:**
+  plain SHA puzzles hand GPU farms a ~1000× edge, and the target
+  audience owns RTX 4090s — so attackers do too.
+- Considered & rejected: **weakened crypto problems** (small-RSA /
+  small-group ECDLP — O(1) to verify, but compute-bound: the
+  100–1000× gap between an optimized GPU solver and bundled client
+  code breaks calibration and discounts exactly the attacker's farm);
+  **VDFs** (prove elapsed *time*, not spent *resources* — parallel
+  instances mint identities in bulk, and with an interactive notary
+  the signed `issued_at` + T_min measures wall-clock directly, no
+  exotic crypto needed); **sampled 64 MB checkpoint chains** (only
+  ever existed to let a weak verifier check minutes of work — atomic
+  peer verification obsoleted them).
+- **PoW is a linear barrier, not a wall.** A mined identity costs
+  under a cent of cloud spot compute. What holds is the stack around
+  it: newborn allowance ≈ 0, growing with *witnessed* age (first-seen
+  — never `issued_at` alone, or hoarded certs would ripen in a
+  drawer); karma confiscation burning the mined cost on abuse; and
+  node-global windows as the absolute resource ceiling. Issuance
+  keeps only WAF-grade per-IP backstops: identity birth is a
+  once-per-lifetime event, so no honest CGNAT crowd approaches them.
+- **Open (next design pass):** a small deposit-hashcash at issuance
+  (64 MB, seconds of work, one Worker-side call — keeps "cert =
+  costly signal" for `require_birth_cert` gates, at the price of
+  WASM-Argon2 on a paid Worker plan) vs. a fully free cert with all
+  cost at first contact; exact parameters (target minutes, T_min,
+  difficulty/params_version raising policy); birth succession on
+  password change (shared with birth certs).
 
 ### Shared mechanics
 
@@ -554,6 +602,290 @@ out. Raises the cost of mass node creation.
   sits in quarantine, and earns weight through verified contributions —
   formalized as karma in the next section. Mandatory payment would kill
   adoption — mass adoption is the product goal.
+
+## Admission gate — per-event pricing (designed 2026-08-14)
+
+Identity certificates make *pseudonyms* scarce; this layer prices
+*events* — CGNAT-clean, no IP math anywhere. It fronts unauthenticated
+surfaces: first contact (ahead of the 5–15 s PoW verification above)
+and an optional anonymous search lane (queries paid in client compute —
+a partial walk-back of the identity-bound-search privacy trade).
+
+### Mode A — sampling gate
+
+Per connection the server derives K fresh nano-tasks
+`task_i = Argon2id(conn_nonce ‖ client_pubkey ‖ i)` (64 MB /
+30–100 ms each, K = 10–20) — client-bound and single-use by
+construction, zero server state. The client answers **all K**; the
+server samples **R = 2** of them *after* submission (interactive, so
+no Fiat–Shamir grinding) and recomputes only those.
+
+- Honest pass: client K·w, server R·w — a K:R asymmetry.
+- Cheating (solve fraction f): pass probability f^R, expected cost
+  W/f^(R−1) — strictly a loss at R ≥ 2.
+- Garbage residual: R·w per attempt, capped by a verification
+  semaphore — and every audit mints pool ammo (below), so garbage
+  floods arm the defense they attack.
+
+### Mode B — two-class pool, the by-product economy
+
+Every first-party computation — R-samples, conflict audits, even
+checks of garbage — yields a true `(task, answer)` pair for free: the
+server computed the truth in order to compare. Those pairs are the
+pool.
+
+- **gold** (first-party computed) — ground truth. Mode B hands one
+  gold task to a stranger: client pays w, server verifies by O(1)
+  memcmp and rejects mismatches with O(1) confidence (our own
+  computation cannot be wrong). Entries minted while failing garbage
+  are the cleanest — their author never solved them, so zero
+  self-redemption risk.
+- **silver** (`not_verified` — the K−R unchecked claims from batches
+  that passed R) — **never ground truth**. Mixed into future Mode-A
+  packets as free cross-validation probes: a match is a quorum vote
+  (M votes from distinct passed connections → promoted to serve
+  Mode B), a mismatch triggers a w-audit that mints the truth and
+  exposes the liar, an R-sample landing on silver gilds it for free.
+- **Audit-on-mismatch** for silver and promoted entries — never a
+  rejection. Combined with gold's certainty this gives the gate a
+  hard property: **false rejection of honest strangers does not exist
+  anywhere**.
+
+Poison economics: planting is cheap (~0.25 entries per w spent at
+R=2, f=0.5) but inert — silver rejects nobody and admits nobody.
+Promotion costs M·K·w per entry (each quorum vote rides a connection
+that passed its own R check), any honest touch destroys the entry —
+and converts it to gold. A fully promoted poison entry buys ≈ one
+w-audit of damage. Conservation law: **cached truth must be
+first-party** (or quorum-corroborated with the audit safety valve);
+unverified claims never become rejection grounds.
+
+Pool policy: single-use (retire on redemption); an abandoned lease
+*retires* the entry (entries are free by-products — returning them
+would enable fishing for one's own); passed-source entries are never
+reissued to their author's pubkey and expire, so author
+self-redemption amortizes back to ≈ the honest per-event price — no
+profit. The family is BOINC/SETI result validation — replication +
+quorum + spot-check — applied to an admission gate.
+
+The precomputed-answer variant (verifier pre-solves cores offline,
+memcmp online) runs at 1:1 per-pass parity with the attacker and is
+kept only for CPU-less verifiers (the Worker, with the master node
+filling KV pairs) — never for peers.
+
+### Identity-bound limits — the resulting layer map
+
+Search and sync requests carry ts-bound Ed25519 signatures (±60 s —
+the existing relay-endpoint pattern). Privacy trade accepted
+2026-08-14: the pubkey is a join key by construction, but taste is
+already broadcast (per-artist DHT announces from the node's IP, open
+sync inventory); in reserve: a purpose-derived search subkey
+(Worker-certified, socially unlinked), blind tokens (§ above). Each
+layer owns exactly one property:
+
+1. **identity scarcity** — cert + ~2 GB hashcash, peer-verified once;
+2. **event pricing** — this admission gate;
+3. **allocation** — per-identity buckets, witnessed-age weight, karma;
+4. **resource ceiling** — node-global windows;
+5. **per-IP** — WAF-grade emergency backstops only, at
+   once-per-lifetime frequencies (birth, first contact) — CGNAT-safe
+   by frequency alone.
+
+## Defense strategy — congestion pricing + similarity (designed 2026-08-16)
+
+The mechanism (cert + gate + pool) is built; this is the *strategy*
+that aims it. Core reframe by Valerii: **stop banning by attribute
+(identity, IP) — those are defeated by rotation — and price by
+similarity to already-suspect traffic.** Established families:
+congestion pricing, client-puzzle auctions (Portcullis, SIGCOMM'07),
+payment-fraud link analysis.
+
+### Threat inventory
+
+The attacks worth pricing against, on a single-user home appliance:
+
+- **(a) Denial of legit service** — starve chat / relay / P2P for real
+  users.
+- **(b) Resource exhaustion as product-killer** — "Sautium makes my PC
+  lag, I'll disable P2P." The most dangerous: it kills the product,
+  not the node. Ceiling on Sautium's own footprint (25% CPU/RAM, lower
+  on lite) is a *product* requirement, not just defense.
+- **(c) Eclipse / isolation** — surround a node with attacker peers
+  (DHT + relay) and filter its view of reality.
+- **(d) Amplification** — make our node attack a third party (the
+  DNS-amplification shape: small request → large action aimed at a
+  spoofed victim). Audit any "we contact X because Y asked" endpoint.
+  Current state: `probe-connect` is safe (connects only to the
+  *observed* TCP source, unspoofable, + per-pubkey cooldown); DHT
+  announce-on-behalf is voucher-gated; Worker email is per-recipient
+  capped.
+- **(e) State-growth** — bloat queues / tables / the task pool. Every
+  new store needs a cap (the pool included).
+- **(f) Pricer griefing** — hold a node near its ceiling so legit
+  users see a high price. Countered by the integral term below.
+
+**Master node is the one asset worth guarding.** At birth every
+identity auto-friends master as a feedback channel — tempting to
+block. Strategic answer is **de-specialization**: master is already
+just relay #0 under the shared cap (phase D). What stays unique — the
+auto-friend feedback channel and support tokens — gets an off-master
+fallback: an E2E-encrypted **Worker mailbox** (KV, TTL + caps +
+client-signed) that master drains when online. Goal: blocking master
+achieves nothing — and it also covers master going offline on its own.
+
+### Similarity: a price coefficient, not a verdict
+
+A single axis fails both ways — CGNAT neighbours share an IP (false
+positive), cheap proxies unshare it (false negative). A **conjunction**
+of axes inverts both: honest CGNAT neighbours collide only on IP
+(births scattered across years, tastes and schedules divergent), while
+an attacker fleet born from one process collides on many axes at once.
+Similarity = product of individually-unlikely coincidences.
+
+Axes, classified by how an attacker beats them:
+
+- **Unforgeable by construction** (real weight): the Worker-signed
+  `issued_at`; the email token (below). These are hard links, stronger
+  than any statistic — equality means same origin.
+- **Expensive to vary** (moderate weight): IP / subnet.
+- **Expensive only to simulate** (≈ zero identity weight — *economic
+  ballast*): behaviour / taste. A bot fills these with noise for free
+  as identity signal — but in a priced world **the noise is not free**:
+  every camouflage request is paid in puzzles, so taste's value is not
+  detection, it is *tax*.
+
+Two hard rules:
+
+- **Weights live on conjunctions, not single axes** — "same birth day"
+  ≈ 0 alone (a growth wave, e.g. a viral review, births hundreds
+  honestly in one day); "same day + same IP + same request targets" is
+  signal. Growth waves recur, so this is permanent hygiene even though
+  the first one passes before enforcement is armed.
+- **Deterministic evidence → ban; statistical evidence → price.** A
+  failed 2 GB check or a broken protocol cannot be a false positive →
+  blacklist. A cluster *cannot*: two honest people in one flat share
+  IP, near births, similar taste. A cluster is only a **collective
+  price multiplier**, anchored on a deterministically-caught member.
+  This dissolves the classic fingerprint-ban fear: the cost of a false
+  positive drops from "excluded" to "entered a bit more expensively."
+
+**Second use of the same metric — dependency diversity.** When picking
+K relays, pick the *most dissimilar* (distinct births, subnets,
+profiles) — a direct eclipse (c) defense. One metric, two consumers
+(and a third: pool reuse below).
+
+### Pricing formula v1
+
+```
+price(action, client) = base(action) × load_mult(headroom) × sim_mult(cluster)
+```
+
+- **base(action)** — from self-profiling (ms CPU + bytes per
+  chat/relay/slice/sync), **calibrated per node** — a lite node is
+  legitimately dearer, its ceiling below 25%. Merges with the planned
+  hardware-tier work.
+- **load_mult** — progressive near the ceiling; HQP playing = low
+  headroom = expensive. Merges with the backlogged playback-aware
+  throttling — one mechanism serves both.
+- **sim_mult** — the statistical layer above.
+
+Engineering shape:
+
+- **Dormant below a load threshold** — entry is free and mechanism-less
+  when there's headroom, because *our* check also costs R·w. The
+  formula already yields ≈ 0 in calm; dormancy also skips the
+  machinery. Only the once-per-identity 2 GB verification never sleeps
+  (amortized by cache). Side effect: the pool grows only under load —
+  exactly when there's traffic to grow it from.
+- **PI controller against griefing (f)** —
+  `price = f(current level) × g(duration held)`: the proportional term
+  hits spikes, the **integral term hits sieges** (sustained
+  non-falling consumption escalates), with decay after relief. The
+  integral term acts on the **stranger market only** — a legit long
+  load (a new friend's initial sync) rides its identity budget, not the
+  market. Attrition favours us: the attacker pays superlinear ×
+  escalation × an army of *dissimilar* bots (else similarity raises his
+  price too); we pay R·w per entry, which he funded.
+- **Free quote → one working round.** The quote is a plain O(1) GET
+  (spam on it is WAF-grade HTTP flood), so the priced round-1 vanishes.
+  The single packet is opaque to the client:
+  `N fresh tasks (payment; sampled R only) + ≥1 gold (O(1) prefilter —
+  garbage dies on memcmp, not on R·w) + 1–2 silver (quorum probes)`.
+  The gold prefilter raises a garbage attempt's cost from ≈ 0 to w
+  (must honestly solve gold to even reach sampling) while dropping our
+  filter cost from R·w to O(1). Gold is author-recognizable → issued
+  via the pool's dissimilarity gate.
+- **Quotes are signed, short-TTL, client-bound** (else a cheap calm
+  quote is presented in a storm); the TTL deadline scales with N.
+  Suspects are never *refused*, only priced (refusal = price ∞ is
+  deterministic-evidence only) — "pay first, then learn you're
+  throttled" becomes "pay the going rate."
+
+### Local standing replaces the friend bit
+
+The hole Valerii caught: master friends *everyone* (auto-friend at
+birth), invite tokens auto-add (30/h cap + `require_birth_cert` is a
+cap, not trust — and itself an attack surface). Therefore **"friend" is
+a social UI bit, not a trust signal.** Reserved (off-market) lanes key
+on **local standing** = witnessed age *at this node* + karma + clean
+history. A newborn auto-friend has standing 0 → rides the market like a
+stranger; a multi-year contributor → reserved lane. The support channel
+gets its own narrow budgeted lane (+ the mailbox fallback). "Everyone's
+a friend" dissolves because friendship now guarantees nothing.
+
+### Email as a hard axis + a succession engine
+
+`email_token = HMAC(worker_pepper, normalize(email))` — the `IP_PEPPER`
+pattern from `verify.js`. Nodes test token *equality* (same token =
+same person — a hard link) without recovering the email (a bare
+`H(email)` is dictionary-weak at low entropy; HMAC under secret is
+not). Normalization before HMAC is mandatory (gmail dots, +tags;
+disposable domains → reduced weight). The token rides the `method:
+email` cert. Double duty: a similarity axis **and** a **succession
+engine** — carrying standing across a password change (new pubkey), and
+symmetrically carrying **bans** across it, closing re-birth evasion for
+verified users. Trap: the pepper can't rotate without migrating every
+link (the `IP_HASH_VERSION=2` lesson).
+
+### No enrichment whitelist — standing is verified contribution
+
+An enrichment-source whitelist would make enrichment poisoning an
+attack vector. Instead, standing comes from **verified** enrichment,
+not *received* enrichment: default-deny (unverified grants nothing),
+the recompute ladder / spot-checks confirm it, a proven fake burns the
+key with everything accrued. "Who I have enrichment from" folds into
+the same standing value as "verified contributions" — the conservation
+law again: trust must be first-party-verified or quorum-corroborated.
+
+### Phased rollout — measure before you arm
+
+Weights cannot be guessed, only measured on the honest network:
+
+- **Phase 0 (now, golden age): measure, no enforcement.** Self-profile
+  action costs; accumulate **local** contact history (raw events TTL'd,
+  aggregates kept) — harvested passively on existing contacts (e.g. MB
+  slice pulls); learn similarity distributions on honest traffic.
+  History is **per-node local** — never a shared banlist (the doc's own
+  "censorship via the defense mechanism" caveat).
+- **Phase 1: price the gate** — base × load_mult, profile ceiling,
+  signed short-TTL quotes, dormancy.
+- **Phase 2: sim_mult** — similarity as a multiplier, anchored on
+  deterministic evidence; email-HMAC axis; standing-keyed lanes.
+- **Phase 3: pool reuse** — reuse a task across clients *sufficiently
+  dissimilar* from prior recipients (the metric's third consumer) +
+  use_count/freshness/quality markers. No pre-mining: the N-task rounds
+  and R-audits mint the pool as a by-product, fastest under attack —
+  the attacker capitalizes the defender.
+
+Each phase is useful alone and blocks none after it.
+
+### The one-line goal
+
+**Make indistinguishability from an honest user no cheaper than being
+honest.** Randomized births cost patience; unshared IPs cost money;
+simulated taste costs paid puzzle-per-request; live schedules cost real
+processes. Every camouflage axis carries its own price, and none is
+free.
 
 ## Earned reputation (useful work, karma)
 
@@ -909,6 +1241,21 @@ quarantine store, flag reports, endorsements, binary acceptance weights.
   whether amount tiers are public or just "donated: yes".
 - Blind-signature issuance for donation/PoW certificates — unlinking
   payment identity from node key at the Worker.
+- Scarcity tier (2026-08-14): deposit-hashcash at issuance vs a fully
+  free cert; target mining minutes / T_min / difficulty &
+  params_version raising policy; whether `method: email` certs carry a
+  nominal work bond; peer-side verification budget (semaphore width,
+  pubkey-blacklist TTL).
+- Admission-gate tuning: K, R, w, quorum M, silver expiry, pool caps;
+  which surfaces get the anonymous compute-priced lane.
+- Defense strategy (2026-08-16): similarity axis weights (measured in
+  phase 0) and the conjunction-scoring function; PI controller gains
+  and the dormancy load threshold; local-standing formula (witnessed
+  age vs karma vs clean-history mix) and reserved-lane budgets; email
+  normalization rules + disposable-domain weighting; Worker-mailbox
+  format (TTL, caps, drain protocol); pool-reuse dissimilarity
+  threshold and use_count/freshness/quality markers; the master
+  support-lane budget and off-master fallback UX.
 - Holdback sizing/rotation for trap issuers — how much computed data a
   node delays publishing, and for how long.
 - Karma exchange rates (trap batches vs matured authorship vs
