@@ -1086,6 +1086,18 @@ Weights cannot be guessed, only measured on the honest network:
   the port mapping exposes real sources.*
 - **Phase 1: price the gate** — base × load_mult, profile ceiling,
   signed short-TTL quotes, dormancy.
+  *Load meter shipped 2026-08-17 (Ф8): `desktop/p2p/load_meter.py` —
+  this process tree's CPU (EMA ~10 s) against the profile ceiling
+  (full/standard 25 %, lite 15 %), playback as a priority signal
+  (backend probes PlaybackManager; an event-path lease of 30 s), `headroom
+  = clamp(1 − cpu/ceiling) × ½ while playing`, `dormant = headroom ≥ 0.5`;
+  memory pressure is left to the memory-heavy jobs' own guards. Consumers
+  today: `mining_hold()` (the identity miner pauses while playing — never
+  on its own CPU, that would oscillate) and `announce_pace()` (DHT chunk
+  pause ×1…×8; on Docker beside the existing hold-while-busy). Published
+  to `user_settings['p2p.load']` on band changes; the P2P card shows
+  "Headroom". `load_mult(headroom)` and dormancy of the gate machinery
+  read this meter in Ф10/Ф12.*
 - **Phase 2: sim_mult** — similarity as a multiplier, anchored on
   deterministic evidence; email-HMAC axis; standing-keyed lanes.
 - **Phase 3: pool reuse** — reuse a task across clients *sufficiently
