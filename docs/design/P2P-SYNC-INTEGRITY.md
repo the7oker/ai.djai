@@ -540,16 +540,30 @@ the ceiling and collapsed the planned tiers into one task.
   instance**; minutes of background mining in the wizard. The
   challenge is the signed cert payload itself: work cannot start
   before issuance, so certs cannot be pre-mined ahead of the key.
-- **Peers verify, once, atomically.** First contact with an unknown
-  `method: pow` identity: Ed25519 cert check (µs) → ripening gate
-  `now ≥ issued_at + T_min` (clock-enforced wall-clock floor — the
-  honest replacement for VDF-style sequentiality) → **one** Argon2id
-  call (seconds — measured below) under a concurrency semaphore (the
-  device_auth pattern) → cached forever (first-seen). A failed check
-  blacklists the pubkey: a cert holder presenting fake work is hostile
-  by definition. An allocation failure on the verifier
+- **Peers verify, once, lazily.** Seeing a `method: pow` identity costs
+  an upsert into the local registry (`p2p_identities`: certificate
+  fields, `first_seen_at` = the witnessed-age anchor, contact counters);
+  the Ed25519 cert check (µs) happens on sight, but the **one** Argon2id
+  call (seconds — measured below) runs the first time the identity claims
+  something identity-gated — accepting a certificate-gated invite token
+  today, the identity lane / relay vouchers / preferred-source picks
+  later. It runs under a process-wide semaphore of one with an
+  available-memory guard (the 2 GiB working set beside a resident ML
+  stack is the limit, not CPU) and the verdict is cached for good. A
+  stranger who never asks for anything is never verified, and a flood of
+  forged proofs is never evaluated unless its author invests in coming
+  back (revised 2026-08-17 from "verify at first contact": most first
+  contacts are one-off pulls, so eager verification bought nothing and
+  handed a CPU-burning vector to free keys). A failed check blacklists
+  the pubkey (`p2p_node_bans`, local): a cert holder presenting fake work
+  is hostile by definition. An allocation failure on the verifier
   (`argon2.exceptions.HashingError`) is a transient *verifier* fault,
-  never evidence against the prover — retry, do not blacklist.
+  never evidence against the prover — "busy, retry", not blacklist.
+  Ripening `now ≥ issued_at + T_min` (clock-enforced wall-clock floor —
+  the honest replacement for VDF-style sequentiality) is a computed
+  property the identity lane will require; token acceptance does not
+  require it (a newborn befriending the master minutes after birth is
+  the product, and ripening buys nothing on a social bit).
 - **Instance size is the anti-GPU knob.** Memory-hard work totals in
   GB·seconds and is shape-independent (call time is welded to memory:
   ~0.5–2 GB/s per core, so 64 MB ≈ 0.1–0.3 s, 2 GB ≈ 5–15 s — there
@@ -656,9 +670,27 @@ the ceiling and collapsed the planned tiers into one task.
   age — a surge price paid is not evidence against the payer; issuance
   stays idempotent (a re-request returns the original difficulty); the
   ledger is advisory (issuance never fails because it did).
-- **Open (next design pass):** T_min; arming policy and measured
+- **Identity registry + first enforcement (shipped 2026-08-17)** —
+  `desktop/p2p/identity_registry.py`, shared by both peer surfaces:
+  `p2p_identities` (registry rules for a known pubkey: `issued_at` must
+  match — anything else is an anomaly and the update is refused; `method`
+  only moves pow → email — a stale pow certificate for an email identity
+  is ignored, not suspicious; `email_token` may change; `first_seen_at`
+  and a `verified` status survive every update) and `IdentityGate.admit`
+  (shape + authority signature → ban list → registry → one evaluation
+  under semaphore/memory guard, `busy` = 503 + Retry-After, a per-address
+  failure backstop = 429, forged proof = 403 + `failed` + ban). The invite
+  token gate `require_birth_cert` now runs BEFORE the use is burned and
+  demands the certificate AND, for `method: pow`, the mined proof; the
+  guest's 15 s resolver loop absorbs "proof pending / busy". State caps:
+  50 000 identity rows (oldest unverified evicted), 10 000 `pow_failed`
+  bans. Measured live: 1.5 s per admission on the master, 80 attempts /
+  111 s to mine one E=32 proof (the p90 tail is real).
+- **Open (next design pass):** T_min value; arming policy and measured
   thresholds for the adaptive multiplier; birth succession on password
-  change (shared with birth certs).
+  change (shared with birth certs); a Docker peer surface sees every
+  client behind the bridge gateway, so its per-address backstop is
+  effectively global (revisit with identity-bound requests).
 
 ### Shared mechanics
 
