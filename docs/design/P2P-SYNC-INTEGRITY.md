@@ -802,6 +802,90 @@ layer owns exactly one property:
    once-per-lifetime frequencies (birth, first contact) — CGNAT-safe
    by frequency alone.
 
+#### Wire format v1 (designed 2026-08-17 — the protocol checkpoint)
+
+Fixed here so that identity-bound requests (Ф6) and the gate slots (Ф8+)
+land without a second protocol change. Scope: the two peer surfaces
+(launcher sync server, Docker `p2p_app` on 8801). Chat and relay
+endpoints keep their existing per-endpoint signatures. Reference values
+for every rule below live in `tests/p2p/vectors/peer_wire_v1.json`
+(fixed test seeds); an implementation that cannot reproduce them is
+wrong.
+
+**1. Request authentication (the identity-bound lane).**
+
+- Headers `X-Sautium-Peer-Pubkey` (hex Ed25519), `X-Sautium-Peer-Ts`
+  (unix seconds), `X-Sautium-Peer-Sig` (hex). Named apart from the Web-UI
+  HMAC (`X-Sautium-Ts/Sig`) on purpose: the peer surface never sees the
+  local secret, and a peer client sends only the `Peer-*` set.
+- Canonical message, UTF-8, LF-joined, signed by the requester's key:
+  `sautium-request:v1 ⏎ {server_pubkey} ⏎ {METHOD} ⏎ {request-target} ⏎ {ts} ⏎ {sha256_hex(body)}`.
+  `server_pubkey` is the `node_id` the client read from the peer's
+  `/health` — a signature is good for exactly one recipient, so a
+  captured request replayed to another node proves nothing there.
+  `request-target` is the origin-form as sent, undecoded (aiohttp
+  `request.raw_path`; ASGI `scope["raw_path"]` + `?` + query string) —
+  never a re-serialised URL. Empty body → sha256 of the empty string.
+- Freshness: `|now − ts| ≤ 60 s` (the relay `TS_WINDOW`). No nonce cache:
+  the identity-bound endpoints are reads or idempotent imports, and the
+  one side effect that must be single-use (a gate payment) carries its
+  own nonce.
+- Unsigned request = **anonymous lane** (today's per-IP + node-global
+  windows, the future compute-priced market). Signed = **stranger lane**
+  until the identity is `verified` and ripe, then **identity lane**
+  (standing joins the condition in Ф15). In the golden age all lanes
+  share the same limits; the lane is only decided and logged (Ф7). A
+  banned pubkey gets `403 identity banned` on signed requests (it can
+  still walk the anonymous lane — that lane is priced, not trusted).
+- Response headers on signed requests: `X-Sautium-Peer-Identity:
+  unknown|unverified|verified|failed|banned` (`unknown` = no registry row
+  → introduce yourself) and `X-Sautium-Peer-Lane: anonymous|stranger|identity`.
+
+**2. Introduction (first contact).** Header `X-Sautium-Peer-Cert` =
+base64url of the JSON `{"cert": <certificate v2>, "proof": <proof|null>}`
+(sorted keys, no spaces, unpadded). Sent when the client's in-memory
+per-peer flag says "not introduced" and again whenever a response says
+`unknown`. The server verifies the certificate (µs) and the pubkey match,
+then `identity_registry.observe()` — the proof is stored, never evaluated
+here (lazy verification, Ф4). An invalid certificate is `400 identity
+certificate invalid` — a bug or version skew, not a ban.
+
+**3. Whitelist.** Never signed, never gated: `GET /health`,
+`GET /api/gate/quote`, `GET /api/relay/voucher`. Identity-bound:
+`/api/sync/*`, `/api/mb/*`.
+
+**4. Gate slots (dormant until priced — Ф8/Ф10, pool in Ф9/Ф11).**
+
+- `GET /api/gate/quote?pubkey={client}` → `{"quote": core, "tasks":
+  [hex32…], "sig": hex}`. `core = {v:1, server, client, nonce (16 B hex),
+  issued, deadline, price_version, params_version, n, tasks_digest =
+  sha256(task inputs concatenated)}`, signed by the server key over
+  `sautium-gate-quote:v1:` + canonical JSON (sorted keys, compact).
+  Dormant: `n = 0`, no tasks, the client attaches nothing. Deadline ∝ n
+  (placeholder `issued + 30 s + 0.5 s × n`).
+- Tasks are opaque 32-byte inputs. Fresh ones are derived, not stored:
+  `HMAC-SHA256(gate_secret, "gate-fresh:v1" ‖ nonce ‖ client_pubkey ‖ i₂)`
+  (`gate_secret` = a per-node random key, not the Ed25519 key); pool ones
+  (gold/silver) are leased to the nonce; positions are shuffled by
+  `HMAC(gate_secret, nonce)` — the client cannot tell which are checked.
+- Answer function, same for every task and every connection (so pool
+  answers stay valid across connections):
+  `Argon2id(secret = input, salt = "sautium-gate:v1", 64 MiB, t = 1, p = 1, 32 B)`.
+- Payment rides the priced request: `X-Sautium-Gate` = base64url of
+  `{"quote": core, "sig": …, "answers": [hex32 …]}` (~1 KB at n = 3,
+  ~2 KB at n = 20). Server: verify its own signature, deadline, `client`
+  == request signer, nonce single-use (seen-set until deadline), then
+  gold memcmp → sample R fresh → silver compare.
+- Codes: `402 gate_required` (armed and unpaid; body carries
+  `quote_url`), `403 gate_failed`, `403 gate_replay`, `410 gate_expired`,
+  `503 gate_busy` + `Retry-After`.
+
+**Known gap, out of scope here:** the peer TLS is self-signed and
+unverified (`CERT_NONE`), so nothing authenticates the *server* — an
+impersonator can serve health/quotes under its own key and waste a
+client's work; record seals protect the data regardless. Fix later:
+pin the peer TLS certificate to the node key.
+
 ## Defense strategy — congestion pricing + similarity (designed 2026-08-16)
 
 The mechanism (cert + gate + pool) is built; this is the *strategy*
