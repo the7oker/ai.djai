@@ -1070,6 +1070,20 @@ Weights cannot be guessed, only measured on the honest network:
   slice pulls); learn similarity distributions on honest traffic.
   History is **per-node local** — never a shared banlist (the doc's own
   "censorship via the defense mechanism" caveat).
+  *Shipped 2026-08-17 (Ф7): `desktop/p2p/contact_log.py` — every served
+  peer request → `p2p_contact_events` (pubkey when signed, addr + /24
+  subnet pseudonyms, endpoint family, lane, status, bytes, wall/CPU ms,
+  items, up to 8 target names), 30-day retention under a 1M-row cap,
+  written off the request path (queue + batch INSERT); the per-endpoint
+  cost EMA in `p2p_action_costs` is the future `base(action)`. Recorded
+  from both peer surfaces' middlewares. `--report` prints endpoint × lane
+  volumes, the cost table, the **repeat-contact ratio** and
+  contacts-per-identity buckets, births per day, subnet and hour-of-day
+  spreads. Caveats recorded in the module: CPU is process-wide (over-
+  attributes under concurrency — an EMA over many samples is the
+  answer, not per-request precision); a Docker peer surface sees every
+  client as the bridge gateway, so its addr/subnet axes are blind until
+  the port mapping exposes real sources.*
 - **Phase 1: price the gate** — base × load_mult, profile ceiling,
   signed short-TTL quotes, dormancy.
 - **Phase 2: sim_mult** — similarity as a multiplier, anchored on
