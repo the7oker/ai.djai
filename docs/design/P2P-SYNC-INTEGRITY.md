@@ -515,6 +515,12 @@ the date to the existing email-verification certificate.
   Age is therefore a weak multiplier over other markers — ideally
   age × clean contribution history over that period — never standalone
   weight.
+- **Shipped as certificate v2 (2026-08-17)** — merged with the
+  proof-of-work certificate below; the v1 `{pubkey, born_at}` shape is
+  gone (pre-release, no shims): `born_at` lives on as `issued_at`, the
+  Worker upgrades v1 KV records in place on first touch (keeping the v1
+  fields for rollback) and every client re-fetches automatically because
+  a v1 file no longer verifies.
 
 ### Proof-of-work certificates (redesigned 2026-08-14)
 
@@ -538,10 +544,12 @@ the ceiling and collapsed the planned tiers into one task.
   `method: pow` identity: Ed25519 cert check (µs) → ripening gate
   `now ≥ issued_at + T_min` (clock-enforced wall-clock floor — the
   honest replacement for VDF-style sequentiality) → **one** Argon2id
-  call (~5–15 s) under a concurrency semaphore (the device_auth
-  pattern) → cached forever (first-seen). A failed check blacklists
-  the pubkey: a cert holder presenting fake work is hostile by
-  definition.
+  call (seconds — measured below) under a concurrency semaphore (the
+  device_auth pattern) → cached forever (first-seen). A failed check
+  blacklists the pubkey: a cert holder presenting fake work is hostile
+  by definition. An allocation failure on the verifier
+  (`argon2.exceptions.HashingError`) is a transient *verifier* fault,
+  never evidence against the prover — retry, do not blacklist.
 - **Instance size is the anti-GPU knob.** Memory-hard work totals in
   GB·seconds and is shape-independent (call time is welded to memory:
   ~0.5–2 GB/s per core, so 64 MB ≈ 0.1–0.3 s, 2 GB ≈ 5–15 s — there
@@ -552,6 +560,23 @@ the ceiling and collapsed the planned tiers into one task.
   sides are capacity-limited (~12 vs ~4–6 instances, ~1.5–3×). Small
   instances are reserved for the admission gate, whose job is
   throttling, not scarcity.
+  **Measured 2026-08-16** (`desktop/p2p/identity_pow.py --bench`,
+  i9-14900HX, argon2-cffi 25.1, WSL and the Docker image agree):
+  2 GiB p=1 ≈ **1.3–1.5 s** (1.4–1.6 GiB/s single lane), 2 GiB p=4 ≈
+  0.5 s, 64 MiB ≈ **35–40 ms** (the gate's unit `w`), peak RSS 2,067 MiB,
+  and argon2-cffi releases the GIL (2 threads → 1.8× throughput). The
+  challenge is the certificate's authority *signature* (commits to every
+  signed field, deterministic, absent before issuance). Verification is
+  therefore ~1.5 s per stranger identity on desktop-class hardware and
+  a semaphore of 1 already clears ~2,000 first contacts an hour; the
+  2 GiB working set — not CPU — is what caps concurrency on a machine
+  where the ML stack is resident. `difficulty` is carried as the
+  expected attempt count E (integer, target = 2^256 // E) — a continuous
+  price scale, so the authority can move it in small steps and pin the
+  golden-age value low (seconds of background work) while escalation
+  raises it only for new births. Wait at 1.4 s/call (geometric): E=128 →
+  mean 3 min / p90 7 / p99 14; E=256 → mean 6 / p90 14 / p99 28; a lite
+  laptop at ~2× the call time doubles these.
 - **Memory-hard (Argon2id, already in the stack), not hash-hard:**
   plain SHA puzzles hand GPU farms a ~1000× edge, and the target
   audience owns RTX 4090s — so attackers do too.
@@ -573,13 +598,67 @@ the ceiling and collapsed the planned tiers into one task.
   node-global windows as the absolute resource ceiling. Issuance
   keeps only WAF-grade per-IP backstops: identity birth is a
   once-per-lifetime event, so no honest CGNAT crowd approaches them.
-- **Open (next design pass):** a small deposit-hashcash at issuance
-  (64 MB, seconds of work, one Worker-side call — keeps "cert =
-  costly signal" for `require_birth_cert` gates, at the price of
-  WASM-Argon2 on a paid Worker plan) vs. a fully free cert with all
-  cost at first contact; exact parameters (target minutes, T_min,
-  difficulty/params_version raising policy); birth succession on
-  password change (shared with birth certs).
+- **Certificate v2 wire format (shipped 2026-08-17):**
+  `{v: 2, pubkey, issued_at, method: pow|email, difficulty,
+  params_version, email_token, email_class, issuer, sig}` over the
+  fixed nine-field payload
+  `sautium-birth:v2:{pubkey}:{issued_at}:{method}:{difficulty}:{params_version}:{email_token|""}:{email_class|""}`
+  (three mirrors: `worker/verify.js`, `desktop/p2p/birth_cert.py`,
+  `backend/birth_authority.py`). Decisions taken: the cert is **free**
+  (no issuance deposit — the Worker stays a notary on the free plan;
+  peer verification + T_min + witnessed age carry the cost, the per-IP
+  backstop on `/birth-certificate` stays); `difficulty` is the
+  **expected attempt count E** (continuous scale; golden-age policy
+  E=32 ≈ 45 s of background mining, raised for new births only);
+  `method: email` carries **no work bond** and adds
+  `email_token = HMAC(EMAIL_PEPPER, "email:" + normalize(email))`
+  (lowercase/NFC, `+tag` stripped for every domain, dots stripped and
+  googlemail→gmail for Gmail) plus `email_class ∈ major|other|disposable`
+  from Worker-side domain lists — the node never sees the domain, so the
+  class rides the cert. Email verification upgrades the SAME record
+  (issued_at unchanged) and `/register-email` returns the new cert.
+  `GET /issuance-stats` publishes per-day birth/upgrade counters and the
+  current policy (CT-lite, best-effort KV counters).
+- **Node-side proof (shipped 2026-08-17)** — `desktop/p2p/identity_proof.py`,
+  shared by the launcher (thread started with P2P) and the Docker backend
+  (lifespan task): the proof `{v, pubkey, cert_sig, nonce, difficulty,
+  params_version, mined_at}` lives in `identity_proof.json` beside
+  `birth_certificate.json` (launcher identity dir; Docker
+  `./data/node_identity` bind mount) and travels in the export/import
+  bundle. Policy: `method: email` → nothing to mine; a stored proof that
+  binds to the certificate is re-verified once in the background (a
+  corrupt proof must never be presented — a failed proof blacklists its
+  presenter); otherwise mine at below-normal thread priority behind a
+  per-attempt gate (≥ 2.5 GiB available memory, mains power), with
+  `HashingError` treated as the same pause. Progress is published to
+  `user_settings['p2p.identity']` + `NOTIFY sautium_identity` (Settings →
+  P2P card "Identity": odds so far, not a percentage of work). A node
+  whose email was verified before v2 self-heals at startup via
+  `/check-email` (method:email certificate, no work).
+- **Adaptive birth pricing — shadow (shipped 2026-08-17, Valerii's
+  proposal):** the Worker is the only party that sees the whole birth
+  process, and a botnet is a mass event. Every first issuance is recorded
+  in a SQLite Durable Object (`BirthLedger`: time, ASN, country, peppered
+  /24 token, method) and scored against the recent births that share an
+  axis with it (`n_sub24`, `n_asn1`, `n_asn24`, `n_glob1`, `n_glob24`); a
+  would-be multiplier `m_shadow` (v0 placeholder thresholds: 3rd birth
+  from one /24 in 24 h ×2, 6th ×4, an ASN minting ≥20/h ×2, ≥60/h
+  globally ×2, cap ×8) is stored per birth and aggregated by
+  `GET /issuance-stats` (`ledger.*`). **Certificates keep the base
+  difficulty until `ADAPTIVE_DIFFICULTY_ARMED` flips** — the honest
+  distribution has to be measured first, exactly as the phased rollout
+  demands. Rules carried into the design: price per CLUSTER, never a
+  global switch (an honest launch wave from one ISP must not pay for a
+  cloud flood; a griefer with free keys must not raise the price for
+  everyone); a hard cap bounds both the false-positive cost (a newborn
+  needs no proof for hours anyway) and a formula bug; nodes read an
+  elevated `difficulty` as a hint axis whose weight decays with witnessed
+  age — a surge price paid is not evidence against the payer; issuance
+  stays idempotent (a re-request returns the original difficulty); the
+  ledger is advisory (issuance never fails because it did).
+- **Open (next design pass):** T_min; arming policy and measured
+  thresholds for the adaptive multiplier; birth succession on password
+  change (shared with birth certs).
 
 ### Shared mechanics
 
@@ -1245,7 +1324,12 @@ quarantine store, flag reports, endorsements, binary acceptance weights.
   free cert; target mining minutes / T_min / difficulty &
   params_version raising policy; whether `method: email` certs carry a
   nominal work bond; peer-side verification budget (semaphore width,
-  pubkey-blacklist TTL).
+  pubkey-blacklist TTL). *Primitive + measurements landed 2026-08-16
+  (`desktop/p2p/identity_pow.py`, params v1 = 2 GiB / t=1 / p=1; numbers
+  in the PoW section above). Cert v2 landed 2026-08-17: free cert, no
+  email bond, E=32 golden-age difficulty (see "Certificate v2 wire
+  format"). Still open: T_min, semaphore width, blacklist TTL — chosen
+  with the registry phase.*
 - Admission-gate tuning: K, R, w, quorum M, silver expiry, pool caps;
   which surfaces get the anonymous compute-priced lane.
 - Defense strategy (2026-08-16): similarity axis weights (measured in
