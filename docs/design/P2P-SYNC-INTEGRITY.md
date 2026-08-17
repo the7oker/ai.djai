@@ -880,6 +880,14 @@ certificate invalid` — a bug or version skew, not a ban.
   `quote_url`), `403 gate_failed`, `403 gate_replay`, `410 gate_expired`,
   `503 gate_busy` + `Retry-After`.
 
+**Shipped 2026-08-17 (Ф6):** items 1–3 are live on both surfaces —
+`desktop/p2p/peer_auth.py` (shared sign/verify, vector-tested),
+`BackendAPIClient(peer=PeerIdentity)` for every outbound peer client
+(launcher and Docker), the aiohttp middleware in `sync_server.py` and the
+ASGI `PeerAuthMiddleware` in `p2p_app.py` (body buffered and replayed,
+`raw_path` + query as the request-target). Item 4 (gate slots) is still
+dormant — no quote endpoint yet.
+
 **Known gap, out of scope here:** the peer TLS is self-signed and
 unverified (`CERT_NONE`), so nothing authenticates the *server* — an
 impersonator can serve health/quotes under its own key and waste a
