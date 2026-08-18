@@ -1124,6 +1124,32 @@ Engineering shape:
   402 price 14 → quote n=13 for the action → paid → 200; a quote for
   another action → 403; shadow → served with the would-be price logged;
   off → n=0) and live on Docker in shadow (dormant → 0).*
+- *Shipped 2026-08-18 (Ф12b) — pressure must not be free.* Three gaps
+  made the escalation runnable at zero cost to the attacker: an empty
+  pool (gold minted from a client's own garbage is never reissued to
+  its author, so a fresh flood met no prefilter and cost us R·w per
+  packet), no cost for a stream of *failed* payments, and a verifier
+  that kept spending at the ceiling. Now: **(1) idle gold seeding** —
+  the node mints authorless gold (`origin='seed'`, no recipient keys,
+  eligible for everyone) one 64 MiB task per load-meter sample while
+  dormant, up to 24 on offer, count re-read every 30 s; a stranger's
+  very first garbage packet dies on memcmp (measured live: 22 seeds
+  in the first 41 s after a restart). Not the pre-mined pool the design
+  rejects (that argument is about scarcity between peers at parity —
+  this bootstraps a filter, bounded and idle-only). **(2) Failed-payment
+  backstop** — 5 failed payments per hour per exclusion key (pubkey /
+  subnet / email domain) → `429 gate_rate_limited`, decided BEFORE the
+  nonce and before any work; an honest client fails once by accident,
+  not five times. **(3) The ceiling wins** — at headroom <
+  `VERIFY_MIN_HEADROOM` (0.1) a priced packet is answered `503 gate_busy`
+  with the nonce released (the same quote pays after relief; a free
+  n=0 packet never reaches the verifier), the 2 GiB identity proof
+  evaluation yields the same way, and a lite profile verifies one packet
+  at a time. Also fixed on the way: `gate_pool.lease` picks through a
+  MATERIALIZED CTE — as an `id IN (SELECT … ORDER BY random() … FOR
+  UPDATE SKIP LOCKED)` semi-join the planner may re-run the volatile
+  subquery per candidate row and the LIMIT stops bounding the packet
+  (observed once: 2 gold + 3 silver leased to one quote).*
 
 ### Local standing replaces the friend bit
 
