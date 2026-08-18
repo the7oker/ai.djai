@@ -1095,6 +1095,34 @@ K relays, pick the *most dissimilar* (distinct births, subnets,
 profiles) — a direct eclipse (c) defense. One metric, two consumers
 (and a third: pool reuse below).
 
+*Shipped 2026-08-18 (Ф14, SHADOW): `desktop/p2p/similarity.py`.
+Pair score = sum of coinciding axes, ZERO unless ≥ 2 axes hit (the
+mailbox token is the one hard link that counts alone): mailbox 4.0;
+birth within 10 min 2.0 / same UTC day 0.5; "wave" 1.0 when both were
+born above the base difficulty within 10 min (the Ф2b hint as an AXIS
+— they paid more, they are not punished for it); exact address 1.5 or
+subnet /24 1.0 (registry `first/last_addr` + new `first/last_subnet`);
+mailbox domain 1.5 for class other|disposable (gmail carries no
+information). Behaviour/taste are not computed — economic ballast.
+Cluster of X = candidates over the threshold 2.0 from ONE indexed
+query (token, domain, address, subnet, birth ± 1 day, LIMIT 2000);
+sim_mult(X) = 1 + 0.5 × Σ min(6, score) over the members that are
+BANNED or `failed`, capped 4× — a cluster nobody was caught in pays
+nothing. `SimilarityIndex` caches per pubkey (TTL 10 min, cap 10k) and
+refreshes on a background thread, so the priced path never waits for
+the database (first ask = 1×, then the value). Wired as `sim_mult` into
+both pricers (shadow: it only moves the logged would-be price), and as
+`relay_order` into the launcher's peer-relay recruitment: least similar
+first — a shared /24 with a held relay counts like a hard link — then
+previously used relays, then the shuffled DHT order. Weights are v0
+placeholders: `contact_log --report` prints the pairwise picture (pairs
+on ≥ 2 axes, axis histogram, identities priced) that calibrates them at
+T2 (~300 identities). Self-test on the live database: a 6-key fleet born
+in one minute from one /24 on one odd domain clusters (birth+subnet+
+domain) but prices 1× until one member is caught, then 3.25×; a CGNAT
+yard (one /24, births months apart, gmail) never scores, even with a
+caught neighbour.*
+
 ### Pricing formula v1
 
 ```
