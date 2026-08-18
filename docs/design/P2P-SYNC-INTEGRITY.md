@@ -910,11 +910,15 @@ certificate invalid` — a bug or version skew, not a ban.
 
 **4. Gate slots (dormant until priced — Ф8/Ф10, pool in Ф9/Ф11).**
 
-- `GET /api/gate/quote?pubkey={client}` → `{"quote": core, "tasks":
-  [hex32…], "sig": hex}`. `core = {v:1, server, client, nonce (16 B hex),
-  issued, deadline, price_version, params_version, n, tasks_digest =
-  sha256(task inputs concatenated)}`, signed by the server key over
-  `sautium-gate-quote:v1:` + canonical JSON (sorted keys, compact).
+- `GET /api/gate/quote?pubkey={client}&action={family}` → `{"quote":
+  core, "tasks": [hex32…], "sig": hex}`. `core = {v:1, server, client,
+  action, nonce (16 B hex), issued, deadline, price_version,
+  params_version, n, tasks_digest = sha256(task inputs concatenated)}`,
+  signed by the server key over `sautium-gate-quote:v1:` + canonical JSON
+  (sorted keys, compact). `action` (2026-08-18) is the endpoint family
+  the payment is good for — `base(action)` prices the request the client
+  is about to make and the server refuses a payment whose quote names
+  another action.
   Dormant: `n = 0`, no tasks, the client attaches nothing. Deadline ∝ n
   (placeholder `issued + 30 s + 0.5 s × n`).
 - Tasks are opaque 32-byte inputs. Fresh ones are derived, not stored:
@@ -1098,6 +1102,28 @@ Engineering shape:
   Suspects are never *refused*, only priced (refusal = price ∞ is
   deterministic-evidence only) — "pay first, then learn you're
   throttled" becomes "pay the going rate."
+- *Shipped 2026-08-18 (Ф12): `desktop/p2p/pricing.py` — `base(action)`
+  = the endpoint's cost EMA (CPU ms + bytes_out / 20 000) in units of
+  **w** (one 64 MiB task, calibrated per node at start: 34.6 ms on the
+  master), floor 1 task; `load_mult` = 1 while headroom ≥ 0.5, linear to
+  8× at headroom 0; the integral term = pressure above the dormant
+  threshold integrated over time with a 600 s half-life, +1× per 300 s
+  of full pressure (steady state ≈ 3.9×; hard cap 8×) — on the stranger
+  market only, the identity lane (verified ∧ ripe) never pays; dormant →
+  0; `sim_mult` = 1 until Ф14; MAX 30 tasks per packet. Modes in
+  `user_settings['p2p.gate_mode']` (default **shadow**): off — nothing;
+  shadow — the would-be price is computed on every identity-bound
+  request and logged (`p2p_contact_events.gate_price/gate_status`), the
+  wire says 0; enforce — quotes carry the price and an unpaid
+  market-lane request answers `402 gate_required` with `price` and a
+  `quote_url` (the client pays once and retries). Quotes are bound to an
+  ACTION (endpoint family in the signed core, added to wire format v1
+  2026-08-18) so a cheap quote cannot be spent on an expensive action.
+  The pricer's live multipliers show as "Market" in the P2P card.
+  Verified in-process on the aiohttp surface (enforce at headroom 0.2:
+  402 price 14 → quote n=13 for the action → paid → 200; a quote for
+  another action → 403; shadow → served with the would-be price logged;
+  off → n=0) and live on Docker in shadow (dormant → 0).*
 
 ### Local standing replaces the friend bit
 
