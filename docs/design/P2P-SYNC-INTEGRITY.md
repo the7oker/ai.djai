@@ -633,6 +633,20 @@ the ceiling and collapsed the planned tiers into one task.
   (issued_at unchanged) and `/register-email` returns the new cert.
   `GET /issuance-stats` publishes per-day birth/upgrade counters and the
   current policy (CT-lite, best-effort KV counters).
+  **v3 (2026-08-18, Valerii's proposal):** hashing the whole address
+  destroys the domain as a cluster axis, so the certificate gains
+  `email_domain_token = HMAC(EMAIL_PEPPER, "email-domain:" + domain)` as a
+  tenth payload field — shared by every gmail identity (no information),
+  unique to a rare domain ("fifty identities on one odd domain" is a
+  conjunction the mailbox token cannot express). No local-part token on
+  purpose: near-zero signal (common names collide, an attacker varies it
+  for free) and it would link a person across providers by name — beyond
+  the accepted mailbox-level trade. Records migrate lazily (v1/v2 → v3,
+  older signature fields kept for rollback; an email record gains the
+  domain token on its next `/register-email` or `/check-email`). Cost of a
+  version bump, stated once: every record is re-signed, so a pow identity's
+  proof (mined over the signature) goes stale and the node re-mines it —
+  fine pre-release, a grace policy before any public release.
 - **Node-side proof (shipped 2026-08-17)** — `desktop/p2p/identity_proof.py`,
   shared by the launcher (thread started with P2P) and the Docker backend
   (lifespan task): the proof `{v, pubkey, cert_sig, nonce, difficulty,
@@ -653,11 +667,14 @@ the ceiling and collapsed the planned tiers into one task.
   proposal):** the Worker is the only party that sees the whole birth
   process, and a botnet is a mass event. Every first issuance is recorded
   in a SQLite Durable Object (`BirthLedger`: time, ASN, country, peppered
-  /24 token, method) and scored against the recent births that share an
-  axis with it (`n_sub24`, `n_asn1`, `n_asn24`, `n_glob1`, `n_glob24`); a
-  would-be multiplier `m_shadow` (v0 placeholder thresholds: 3rd birth
-  from one /24 in 24 h ×2, 6th ×4, an ASN minting ≥20/h ×2, ≥60/h
-  globally ×2, cap ×8) is stored per birth and aggregated by
+  /24 token and — since 2026-08-18 — the peppered exact address, method)
+  and scored against the recent births that share an axis with it
+  (`n_addr24`, `n_sub24`, `n_asn1`, `n_asn24`, `n_glob1`, `n_glob24`; a
+  /24 in a cloud provider spans many tenants, one VPS minting twenty
+  identities is the sharper conjunction); a would-be multiplier
+  `m_shadow` (v0 placeholder thresholds: 3rd birth from one exact
+  address in 24 h ×2, 3rd from one /24 ×2, 6th ×4, an ASN minting ≥20/h
+  ×2, ≥60/h globally ×2, cap ×8) is stored per birth and aggregated by
   `GET /issuance-stats` (`ledger.*`). **Certificates keep the base
   difficulty until `ADAPTIVE_DIFFICULTY_ARMED` flips** — the honest
   distribution has to be measured first, exactly as the phased rollout
@@ -802,7 +819,7 @@ layer owns exactly one property:
    once-per-lifetime frequencies (birth, first contact) — CGNAT-safe
    by frequency alone.
 
-#### Wire format v1 (designed 2026-08-17 — the protocol checkpoint)
+#### Wire format v1 (designed 2026-08-17 — the protocol checkpoint; certificate fixture v3 since 2026-08-18)
 
 Fixed here so that identity-bound requests (Ф6) and the gate slots (Ф8+)
 land without a second protocol change. Scope: the two peer surfaces
