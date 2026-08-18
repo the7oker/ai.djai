@@ -815,6 +815,29 @@ memcmp online) runs at 1:1 per-pass parity with the attacker and is
 kept only for CPU-less verifiers (the Worker, with the master node
 filling KV pairs) — never for peers.
 
+*Shipped 2026-08-18 (Ф11): `desktop/p2p/gate_pool.py` (`p2p_gate_pool`:
+task, answer, class gold|silver, origin sample|audit|garbage|claim,
+source, votes, use_count, `recipient_keys`, lease, expiry 7 d, cap
+10k) + the Mode B loop in `gate_service.py`. A priced packet =
+n_fresh + 1 gold + 2 silver, shuffled; verification order: our
+signature/binding/nonce → **gold memcmp prefilter** (garbage dies at
+O(1), the entry is retired) → R fresh recomputed (every truth minted as
+gold: origin `sample` when the packet passed, `garbage` when not) →
+**silver probes** (match = vote, quorum M=3 promotes — origin stays
+`claim` so a later mismatch still audits; mismatch = w-audit that gilds
+the entry and names the liar: the source via `on_evidence` →
+`p2p_node_bans(reason='gate_lie')`, or the current client whose packet
+then fails) → up to 6 unsampled fresh claims minted as silver. Reissue
+is an EXCLUSION on hard axes, not a ranking: `recipient_keys` (pubkey,
+`subnet:`, `domain:`) of everyone who held an entry, one indexed
+array-overlap query and a random pick among the eligible — gold is
+single-use so its check is against one author, silver carries ≤ M keys.
+Abandoned leases retire the entry; a presented lease is a use whatever
+follows. Verified live against Postgres (`--selftest`: two honest
+packets → gold/silver minted and reused, garbage → burned, a planted
+lying claim → audited, gilded, source named; replay → refused) and
+in-process on the aiohttp surface (three clients: 6, 9, 9 tasks).*
+
 ### Identity-bound limits — the resulting layer map
 
 Search and sync requests carry ts-bound Ed25519 signatures (±60 s —
