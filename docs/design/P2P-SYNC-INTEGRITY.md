@@ -1028,6 +1028,32 @@ fallback: an E2E-encrypted **Worker mailbox** (KV, TTL + caps +
 client-signed) that master drains when online. Goal: blocking master
 achieves nothing — and it also covers master going offline on its own.
 
+*Shipped 2026-08-18 (Ф16): `POST /mailbox` on the Worker parks the
+ordinary chat wire payload — NaCl Box ciphertext to the master's chat
+key, the Worker never sees plaintext — signed by the sender
+(`mailbox:v1:{to}:{message_uuid}:{timestamp}:{sha256(encrypted)}`),
+gated by a birth certificate issued there (no free keys) and by per-IP
+(60/h), per-sender (30/day) and global (5 000/day) caps, in a
+SQLite-backed Durable Object (`MasterMailbox`: TTL 30 d, 20 k rows,
+oldest evicted; one instance, keyed by the pinned master pubkey — the
+only mailbox that exists). The master drains on an EVENT, never a timer:
+it holds an outbound WebSocket to `GET /mailbox/wake` (hibernating on
+the DO side; keepalives auto-answered) and receives "mail" on every
+store; drain = master-signed `GET /mailbox` pages of 200 → import
+through the same `handle_incoming` as the direct path (friend right,
+size cap, `message_uuid` dedup) → `DELETE /mailbox?upto=id` ack; a
+handler failure leaves the page unacked. Sender side (launcher
+`_mailbox_deposit`): only when the direct path found no route — the
+place `_relay_forward` used to give up for the master; acceptance is
+delivery (handed to the mailbox, like mail to an MTA). Shared code
+`desktop/p2p/mailbox_client.py`; the drain runs in the Docker backend
+when its identity IS the master. Verified live: deposit from a
+throwaway certified key → the master's socket woke and drained within
+seconds, the non-friend message was dropped by the friend-right check
+and acked. Not done: a launcher-side drain (no launcher is the master)
+and mailboxes for anyone else (a general dead-drop is a different
+product with a different abuse surface).*
+
 ### Similarity: a price coefficient, not a verdict
 
 A single axis fails both ways — CGNAT neighbours share an IP (false
