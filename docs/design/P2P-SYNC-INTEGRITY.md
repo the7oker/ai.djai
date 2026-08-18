@@ -754,6 +754,20 @@ no Fiat–Shamir grinding) and recomputes only those.
 - Garbage residual: R·w per attempt, capped by a verification
   semaphore — and every audit mints pool ammo (below), so garbage
   floods arm the defense they attack.
+- *Primitives shipped 2026-08-18 (Ф9): `desktop/p2p/admission.py` —
+  fresh inputs derived from the node's gate secret (`HMAC(gate_secret,
+  "gate-fresh:v1" ‖ nonce ‖ client_pubkey ‖ i)`), the deterministic
+  position shuffle, one answer function for every task
+  (`Argon2id(input, salt "sautium-gate:v1", 64 MiB, t=1, p=1)`), the
+  signed quote core and the `X-Sautium-Gate` payment encoding, sampled
+  verification with server randomness drawn after submission — all
+  reproducing the wire-format vectors. Measured on the i9-14900HX:
+  **w = 34 ms** per task single-threaded, a 20-task packet in 227 ms on
+  4 threads (3.0× — argon2-cffi releases the GIL) / 163 ms on 8, peak
+  RSS 520 MiB at 8 threads; honest packet n=20 costs the client ≈0.7 s
+  serial (0.2 s pooled) and the server R=2 ≈ 67 ms; a cheater solving
+  half passes 25 % of the time and pays 2× the honest price per
+  success — the asymmetry as designed.*
 
 ### Mode B — two-class pool, the by-product economy
 
