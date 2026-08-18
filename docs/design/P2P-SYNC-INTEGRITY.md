@@ -916,8 +916,29 @@ certificate invalid` — a bug or version skew, not a ban.
 `BackendAPIClient(peer=PeerIdentity)` for every outbound peer client
 (launcher and Docker), the aiohttp middleware in `sync_server.py` and the
 ASGI `PeerAuthMiddleware` in `p2p_app.py` (body buffered and replayed,
-`raw_path` + query as the request-target). Item 4 (gate slots) is still
-dormant — no quote endpoint yet.
+`raw_path` + query as the request-target).
+
+**Shipped 2026-08-18 (Ф10):** item 4 is live and DORMANT —
+`desktop/p2p/gate_service.py` on both surfaces: `GET /api/gate/quote`
+(signed, client-bound, n = 0 while the price function returns 0), the
+gate secret derived from the node's Ed25519 seed (no new file), and
+`X-Sautium-Gate` verification in both middlewares: our signature, our
+pubkey, the quoted client == request signer, alive (±60 s skew, ≤
+deadline), single-use (a per-nonce seen-set that lives until the
+deadline and is released again on a transient failure so a busy verifier
+never burns a quote), tasks_digest recomputed from the secret, then R
+answers recomputed under a semaphore of 2 (R × 64 MiB) with server
+randomness drawn after submission. Verdicts: `ok` (response header
+`X-Sautium-Gate-Result: ok`), `403 gate_invalid | gate_replay |
+gate_failed`, `410 gate_expired`, `503 gate_busy` + Retry-After; a
+failed or short packet burns the nonce (deterministic evidence). The
+client (`BackendAPIClient.gate_pay/gate_prepay`) verifies the quote is
+the peer's and its own before working, solves in a small thread pool
+and, on `402 gate_required`, pays once and retries. Verified live
+against the Docker surface at n = 0 (ok / replay / tampered / unsigned)
+and in-process against the aiohttp surface with an armed test instance
+(n = 4: ok / replay / garbage → gate_failed). Pool tasks (Ф11) and the
+price function (Ф12) plug into `_pool_tasks()` and `price`.
 
 **Known gap, out of scope here:** the peer TLS is self-signed and
 unverified (`CERT_NONE`), so nothing authenticates the *server* — an
