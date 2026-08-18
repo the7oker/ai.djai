@@ -660,23 +660,6 @@ the ceiling and collapsed the planned tiers into one task.
   need no Worker round-trip: the link is signed into the identity
   document, and the `email_token` links every key that ever verified
   the mailbox even across a hop this node never met.
-  **Grace policy (2026-08-18):** a bump used to cut every peer on the
-  previous release off at once (their certificates failed the shape
-  check) and to leave every pow identity proof-less until it re-mined.
-  Now the three mirrors accept the CURRENT and the PREVIOUS format
-  (`ACCEPTED_CERT_VERSIONS = (4, 3)`), each verified over its own payload
-  (fields are only ever appended); issuance is always current, the
-  Worker's `/register-email` takes a previous-format client copy;
-  clients upgrade eagerly (`is_current` false → one Worker read) but
-  STAGE a re-signed pow certificate in `birth_certificate.next.json`
-  behind the current (certificate, proof) pair — still valid under grace
-  — and promote it only when its proof is mined (proof written, then the
-  file renamed into place; a crash between the two writes heals on the
-  next start; an email certificate is adopted at once; a node without a
-  complete old pair adopts directly). An identity is never left without
-  a valid pair; the UI shows the mining as an upgrade. When bumping:
-  version += 1, append the field, drop the oldest accepted version — one
-  release cycle of grace, no dates to remember.
 - **Node-side proof (shipped 2026-08-17)** — `desktop/p2p/identity_proof.py`,
   shared by the launcher (thread started with P2P) and the Docker backend
   (lifespan task): the proof `{v, pubkey, cert_sig, nonce, difficulty,
