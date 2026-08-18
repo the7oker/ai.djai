@@ -1123,6 +1123,30 @@ domain) but prices 1× until one member is caught, then 3.25×; a CGNAT
 yard (one /24, births months apart, gmail) never scores, even with a
 caught neighbour.*
 
+*Mailbox domains as a node-side policy table (Valerii, 2026-08-18: "the
+domain hash can be a reliability index too") — `desktop/p2p/email_domains.py`.
+Nodes only ever see the domain TOKEN, so the maintainer precomputes the
+tokens of the domains worth an opinion (under EMAIL_PEPPER, `--regen`,
+maintainer-only; `--check` is a release step) and ships them inline in
+code: `domain: (tier, reliability, token)`. Two readings per token:
+`tier` (protected | open | disposable) says how POPULOUS the provider is
+and decides whether sharing the domain is informative for similarity
+(populous — no; disposable or absent from the table — yes; the Worker's
+issuance-time class is only the fallback when the table has no opinion,
+so a list drift never fakes a "rare domain"); `reliability` ∈ [0, 1] is
+the RELATIVE COST OF ONE MAILBOX (1.0 phone/ML-gated, ~0.3 captcha-only,
+0.0 disposable) — a price prior for the standing seed of a newborn (Ф15)
+and for whatever later asks "how expensive was this identity to mint",
+never trust (PVA markets exist; still orders of magnitude above a proof
+of work). Why in code and not in the certificate: policy per DOMAIN,
+changed by a release, applied retroactively to every certificate already
+issued, and the Worker stays a notary (its coarse `email_class` remains
+the issuance-time catch for fresh disposable births, since the Worker
+sees the domain). Cost stated once: the shipped tokens de-anonymise
+exactly the listed domains — the populous ones; rare domains stay behind
+the pepper. Ф2b will read the same fact directly on the Worker (protected
+email births weigh less in a wave).*
+
 ### Pricing formula v1
 
 ```
