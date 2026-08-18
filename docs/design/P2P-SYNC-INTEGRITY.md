@@ -647,6 +647,19 @@ the ceiling and collapsed the planned tiers into one task.
   version bump, stated once: every record is re-signed, so a pow identity's
   proof (mined over the signature) goes stale and the node re-mines it —
   fine pre-release, a grace policy before any public release.
+  **v4 (2026-08-18, Ф13):** an eleventh payload field, `predecessor` — the
+  pubkey that held this mailbox before the current registration. The
+  Worker keeps `mailbox:{email_token}` → current holder; a fresh
+  `/register-email` moves the mailbox to the registering key and names
+  the previous holder in the new certificate (`/check-email` and lazy
+  migration only backfill the index, they never take a mailbox over —
+  the newest REGISTRATION owns it, not the newest touch). Email records
+  only; empty otherwise; a key re-registering its own mailbox changes
+  nothing; a re-take by an earlier holder names the intermediate key
+  (a cycle is fine — the registry keeps "who currently holds"). Nodes
+  need no Worker round-trip: the link is signed into the identity
+  document, and the `email_token` links every key that ever verified
+  the mailbox even across a hop this node never met.
 - **Node-side proof (shipped 2026-08-17)** — `desktop/p2p/identity_proof.py`,
   shared by the launcher (thread started with P2P) and the Docker backend
   (lifespan task): the proof `{v, pubkey, cert_sig, nonce, difficulty,
@@ -1176,6 +1189,25 @@ engine** — carrying standing across a password change (new pubkey), and
 symmetrically carrying **bans** across it, closing re-birth evasion for
 verified users. Trap: the pepper can't rotate without migrating every
 link (the `IP_HASH_VERSION=2` lesson).
+
+*Shipped 2026-08-18 (Ф13): certificate v4 names the `predecessor` (see
+"Certificate v2 wire format" above) and `identity_registry.observe`
+carries succession on both surfaces: for the notary-named predecessor and
+every row sharing the `email_token` — excluding the key itself — the new
+identity takes `first_seen_at = LEAST(...)` (witnessed age carries: only
+what THIS node saw, a predecessor unknown here carries nothing), the
+contact count of the freshest link, and a ban if any of them is banned or
+`failed` (`p2p_node_bans` reason `succession` — the same request that
+introduces the heir is answered 403). Old rows get `succeeded_by` = the
+current holder; the operation is idempotent (a row already pointing at
+this holder contributes nothing twice) and cycle-safe (a re-take flips
+the pointers). Standing (Ф15) reads `first_seen_at`, so it inherits by
+construction. Verified against the live database (`identity_registry
+--selftest`): a banned email identity's heir is banned on sight with the
+40-day witnessed age carried; a clean 70-day veteran's heir keeps
+`verified`, contacts 1+5, age carried, even with an unknown intermediate
+hop; a second observe carries nothing twice. `contact_log --report`
+prints the succession counters.*
 
 ### No enrichment whitelist — standing is verified contribution
 
