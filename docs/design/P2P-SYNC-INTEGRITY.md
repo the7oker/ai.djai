@@ -718,9 +718,11 @@ the ceiling and collapsed the planned tiers into one task.
   111 s to mine one E=32 proof (the p90 tail is real).
 - **Open (next design pass):** T_min value; arming policy and measured
   thresholds for the adaptive multiplier; birth succession on password
-  change (shared with birth certs); a Docker peer surface sees every
-  client behind the bridge gateway, so its per-address backstop is
-  effectively global (revisit with identity-bound requests).
+  change (shared with birth certs); a Docker peer surface behind Docker
+  Desktop sees every client as the bridge gateway, so its per-address
+  backstop is effectively global — *resolved on the master 2026-08-19 by
+  the trusted front (P2P_NETWORK.md § "Master behind a trusted front");
+  other Docker-Desktop nodes stay blind until they run one.*
 
 ### Shared mechanics
 
@@ -1318,9 +1320,11 @@ Weights cannot be guessed, only measured on the honest network:
   contacts-per-identity buckets, births per day, subnet and hour-of-day
   spreads. Caveats recorded in the module: CPU is process-wide (over-
   attributes under concurrency — an EMA over many samples is the
-  answer, not per-request precision); a Docker peer surface sees every
-  client as the bridge gateway, so its addr/subnet axes are blind until
-  the port mapping exposes real sources.*
+  answer, not per-request precision); a Docker peer surface behind Docker
+  Desktop sees every client as the bridge gateway, so its addr/subnet axes
+  are blind until a trusted front exposes real sources — the master runs
+  one since 2026-08-19 (P2P_NETWORK.md § "Master behind a trusted
+  front").*
 - **Phase 1: price the gate** — base × load_mult, profile ceiling,
   signed short-TTL quotes, dormancy.
   *Load meter shipped 2026-08-17 (Ф8): `desktop/p2p/load_meter.py` —
