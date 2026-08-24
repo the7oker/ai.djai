@@ -982,11 +982,31 @@ and in-process against the aiohttp surface with an armed test instance
 (n = 4: ok / replay / garbage → gate_failed). Pool tasks (Ф11) and the
 price function (Ф12) plug into `_pool_tasks()` and `price`.
 
-**Known gap, out of scope here:** the peer TLS is self-signed and
-unverified (`CERT_NONE`), so nothing authenticates the *server* — an
-impersonator can serve health/quotes under its own key and waste a
-client's work; record seals protect the data regardless. Fix later:
-pin the peer TLS certificate to the node key.
+**Closed 2026-08-24 — peer TLS is pinned to the node key.** The gap
+was: peer TLS self-signed and unverified (`CERT_NONE` everywhere), so
+nothing authenticated the *server* — an impersonator could serve
+health/quotes under its own key and waste a client's work (seals
+protected the data regardless). Now the server cert carries a private
+X.509 extension (`peer_auth.TLS_BINDING_OID` — int32-safe components
+only: Go's x509, i.e. the master's Caddy front, refuses to load a cert
+whose extension OID has a component over int32, which killed the
+prettier 2.25.{uuid} arc): the node pubkey + its Ed25519 signature over the
+cert's own SPKI (`sautium-tls-bind:v1:` + sha256). The handshake proves
+possession of the TLS key, the extension proves the node key vouches
+for it. Client side, `peer_auth.pinned_ssl_context(expected_pubkey)`
+verifies per-handshake (SSLSocket for urllib, SSLObject for
+aiohttp/asyncio) and REQUIRES a valid binding: known-key callers
+(friends, relays, the master, probe-connect callbacks) pin hard;
+unknown-key callers (DHT-discovered sync/slice peers) lock onto the
+first verified key per context, and `BackendAPIClient` takes the
+server pubkey FROM THE CHANNEL — a `/health` body that disagrees is
+refused, so quotes are only ever paid to the key that owns the
+connection. Certs regenerate themselves when the binding is missing or
+belongs to a previous identity (`node_identity.ensure_tls_cert`,
+`tls_gen.ensure_cert(binding=...)`); the master's Caddy front serves
+the same bound file. The schemeless plain-HTTP peer fallback in
+`_try_connect_peer` is gone — a downgrade path would have nullified
+the pin.
 
 ## Defense strategy — congestion pricing + similarity (designed 2026-08-16)
 
