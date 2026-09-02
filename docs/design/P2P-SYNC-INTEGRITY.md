@@ -11,8 +11,9 @@
 > (payload change without new signature strips the seal — no writer can
 > silently break a sealed record); record payload **v2** adds
 > duration_seconds to the material declaration (cheap no-decode import
-> gate; tamper-evident); tier-3 stream signing live for deezer-lossless
-> sources; **Tier-0 lite on import** — signed/first-hand rows never
+> gate; tamper-evident); tier-3 stream signing live for every first-hand
+> stream (Deezer any tier and YouTube since 2026-09-02 — lossless-only
+> before); **Tier-0 lite on import** — signed/first-hand rows never
 > overwritten by sync, `analysis_sources.imported` excludes synced-in
 > provenance from signing. Still design: signed records on the wire +
 > import verify, segments sync, full Tier 0 (per-node origin, purge),
@@ -248,7 +249,8 @@ a *verified owner* recomputes and endorses it.
    **skips it** — specifically, never overwrites a signed row nor
    re-derives locally what should come from a clean stream.
 3. **Streamed clean source** → the key move: enrichment computed from a
-   streamed official source (Deezer lossless) is signed against **the
+   streamed source (Deezer any tier or YouTube — lossless-only until
+   2026-09-02) is signed against **the
    stream's** `pcm_hash`, not the local file's. So a grey album gets
    *signed* enrichment via its clean digital master while the local file
    stays an unsigned vinyl rip — **no possession of the bootleg is ever
