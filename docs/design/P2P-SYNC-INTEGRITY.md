@@ -1502,6 +1502,31 @@ independent stamps ≈ one Worker stamp) or external free services
 fallbacks, and a node can publish unstamped — the records work,
 authorship karma just waits for a stamp (graceful degradation).
 
+**Identity-priced notary (Ф20, 2026-09-06, shadow).** The "one free stamp
+per node per day, more for weighted keys" above is now an algorithm on the
+Worker, keyed by the identity the plan's invariants allow it to trust — not
+the PoW (a 128 MB isolate cannot verify 2 GiB Argon2id, and the Worker is
+the notary, not the verifier), but what the Worker vouches for itself: the
+mailbox class it verified, the birth it witnessed, the stamps it issued.
+`/timestamp` carries `pubkey, ts, signature` over
+`sautium-timestamp-request:v1:{ts}:{roots}`, and the birth ledger prices
+each request as a token bucket (`STAMP_BURST` deep, refilled at
+`STAMP_BASE_PER_DAY × weight(method, email_class) × age_ramp(witnessed)
+÷ m(conjunction)` per day): a verified mailbox doubles the budget, a day-old
+key gets a quarter of it (enough for its first batch — mint-and-flood pays
+in idle weeks, no PoW check needed), and `m` conjoins the birth's own
+multiplier with the stamps table — identities stamping from the same
+address that were also born in the same window (the address alone is a
+CGNAT cohort; address and birth window together is a farm). Only NEW roots
+are charged, so a re-stamp is free. Shadow until `STAMP_BUDGET_ARMED`: the
+verdict is recorded (`/issuance-stats` → `ledger.notary`) and returned as
+`not_before`, which the client's notary obeys as its pace; per-address
+brakes (Rate Limiting bindings, exact IPv4 / IPv6 /64, no KV write) are the
+only 429 — WAF-grade, sized for a cohort. Unsigned requests (older clients)
+still stamp and are counted, so the arming decision can read the share.
+`ip_hash` hashes the /64 for IPv6 (v3); `signing_batches.timestamp_version`
+travels with every batch so a payload bump invalidates nothing issued.
+
 ### Trap-job protocol (fast lane for newcomers)
 
 A reputable node `R` keeps a **holdback set** — records it has computed
