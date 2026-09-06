@@ -352,6 +352,20 @@ per-track *content* root: nodes still hold different segment subsets, but
 each node timestamps its *own* batch of signed records, and that is exactly
 what a priority claim needs.
 
+Since 2026-09-06 the two signatures are two **stages** with one owner.
+`sign_audio.sign()` author-signs on every producer's wake — scan, analysis
+run, stream enricher, background pass, all routed through
+`backend/notary.py` — so a record is final the moment its analysis
+commits, and no producer has to remember to seal (the stream enricher never
+did: 30 streamed tracks sat unsigned until an unrelated scan).
+`sign_audio.stamp()` batches everything signed-but-unstamped into one root
+on the notary's own cadence (≥ 15 min apart: one stamp per listening burst
+against the Worker's per-IP budget, which a CGNAT cohort shares), and a
+Worker failure or 429 now defers the stamp instead of discarding the
+batch. A record still travels only once stamped — the pull and carry gates
+read `batch_root` — so the stamp remains the admission signal that binds a
+free key to an address.
+
 **P2P replace (signed supersedes unsigned) — deferred design.** A signed
 record (typically stream-derived, official `pcm_hash`) should be able to
 replace an unsigned same-track record locally and across sync. Open
