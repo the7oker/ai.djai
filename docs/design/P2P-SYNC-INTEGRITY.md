@@ -701,13 +701,9 @@ the ceiling and collapsed the planned tiers into one task.
   (`n_addr24`, `n_sub24`, `n_asn1`, `n_asn24`, `n_glob1`, `n_glob24`; a
   /24 in a cloud provider spans many tenants, one VPS minting twenty
   identities is the sharper conjunction); a would-be multiplier
-  `m_shadow` (v0 placeholder thresholds: 3rd birth from one exact
-  address in 24 h ×2, 3rd from one /24 ×2, 6th ×4, an ASN minting ≥20/h
-  ×2, ≥60/h globally ×2, cap ×8) is stored per birth and aggregated by
-  `GET /issuance-stats` (`ledger.*`). **Certificates keep the base
-  difficulty until `ADAPTIVE_DIFFICULTY_ARMED` flips** — the honest
-  distribution has to be measured first, exactly as the phased rollout
-  demands. Rules carried into the design: price per CLUSTER, never a
+  `m_shadow` is stored per birth and aggregated by `GET /issuance-stats`
+  (`ledger.*`); the thresholds and the arming policy are operational
+  notes. Rules carried into the design: price per CLUSTER, never a
   global switch (an honest launch wave from one ISP must not pay for a
   cloud flood; a griefer with free keys must not raise the price for
   everyone); a hard cap bounds both the false-positive cost (a newborn
@@ -732,13 +728,6 @@ the ceiling and collapsed the planned tiers into one task.
   50 000 identity rows (oldest unverified evicted), 10 000 `pow_failed`
   bans. Measured live: 1.5 s per admission on the master, 80 attempts /
   111 s to mine one E=32 proof (the p90 tail is real).
-- **Open (next design pass):** T_min value; arming policy and measured
-  thresholds for the adaptive multiplier; birth succession on password
-  change (shared with birth certs); a Docker peer surface behind Docker
-  Desktop sees every client as the bridge gateway, so its per-address
-  backstop is effectively global — *resolved on the master 2026-08-19 by
-  the trusted front (P2P_NETWORK.md § "Master behind a trusted front");
-  other Docker-Desktop nodes stay blind until they run one.*
 
 ### Shared mechanics
 
@@ -1152,10 +1141,7 @@ the database (first ask = 1×, then the value). Wired as `sim_mult` into
 both pricers (shadow: it only moves the logged would-be price), and as
 `relay_order` into the launcher's peer-relay recruitment: least similar
 first — a shared /24 with a held relay counts like a hard link — then
-previously used relays, then the shuffled DHT order. Weights are v0
-placeholders: `contact_log --report` prints the pairwise picture (pairs
-on ≥ 2 axes, axis histogram, identities priced) that calibrates them at
-T2 (~300 identities). Self-test on the live database: a 6-key fleet born
+previously used relays, then the shuffled DHT order. Weight calibration is an operational note. Self-test on the live database: a 6-key fleet born
 in one minute from one /24 on one odd domain clusters (birth+subnet+
 domain) but prices 1× until one member is caught, then 3.25×; a CGNAT
 yard (one /24, births months apart, gmail) never scores, even with a
@@ -1282,10 +1268,8 @@ Engineering shape:
 
 ### Local standing replaces the friend bit
 
-The hole Valerii caught: master friends *everyone* (auto-friend at
-birth), invite tokens auto-add (30/h cap + `require_birth_cert` is a
-cap, not trust — and itself an attack surface). Therefore **"friend" is
-a social UI bit, not a trust signal.** Reserved (off-market) lanes key
+The master auto-friends every identity at birth and invite tokens
+auto-add, so **"friend" is a social UI bit, not a trust signal.** Reserved (off-market) lanes key
 on **local standing** = witnessed age *at this node* + karma + clean
 history. A newborn auto-friend has standing 0 → rides the market like a
 stranger; a multi-year contributor → reserved lane. The support channel
@@ -1335,55 +1319,12 @@ key with everything accrued. "Who I have enrichment from" folds into
 the same standing value as "verified contributions" — the conservation
 law again: trust must be first-party-verified or quorum-corroborated.
 
-### Phased rollout — measure before you arm
+### Phased rollout
 
-Weights cannot be guessed, only measured on the honest network:
-
-- **Phase 0 (now, golden age): measure, no enforcement.** Self-profile
-  action costs; accumulate **local** contact history (raw events TTL'd,
-  aggregates kept) — harvested passively on existing contacts (e.g. MB
-  slice pulls); learn similarity distributions on honest traffic.
-  History is **per-node local** — never a shared banlist (the doc's own
-  "censorship via the defense mechanism" caveat).
-  *Shipped 2026-08-17 (Ф7): `desktop/p2p/contact_log.py` — every served
-  peer request → `p2p_contact_events` (pubkey when signed, addr + /24
-  subnet pseudonyms, endpoint family, lane, status, bytes, wall/CPU ms,
-  items, up to 8 target names), 30-day retention under a 1M-row cap,
-  written off the request path (queue + batch INSERT); the per-endpoint
-  cost EMA in `p2p_action_costs` is the future `base(action)`. Recorded
-  from both peer surfaces' middlewares. `--report` prints endpoint × lane
-  volumes, the cost table, the **repeat-contact ratio** and
-  contacts-per-identity buckets, births per day, subnet and hour-of-day
-  spreads. Caveats recorded in the module: CPU is process-wide (over-
-  attributes under concurrency — an EMA over many samples is the
-  answer, not per-request precision); a Docker peer surface behind Docker
-  Desktop sees every client as the bridge gateway, so its addr/subnet axes
-  are blind until a trusted front exposes real sources — the master runs
-  one since 2026-08-19 (P2P_NETWORK.md § "Master behind a trusted
-  front").*
-- **Phase 1: price the gate** — base × load_mult, profile ceiling,
-  signed short-TTL quotes, dormancy.
-  *Load meter shipped 2026-08-17 (Ф8): `desktop/p2p/load_meter.py` —
-  this process tree's CPU (EMA ~10 s) against the profile ceiling
-  (full/standard 25 %, lite 15 %), playback as a priority signal
-  (backend probes PlaybackManager; an event-path lease of 30 s), `headroom
-  = clamp(1 − cpu/ceiling) × ½ while playing`, `dormant = headroom ≥ 0.5`;
-  memory pressure is left to the memory-heavy jobs' own guards. Consumers
-  today: `mining_hold()` (the identity miner pauses while playing — never
-  on its own CPU, that would oscillate) and `announce_pace()` (DHT chunk
-  pause ×1…×8; on Docker beside the existing hold-while-busy). Published
-  to `user_settings['p2p.load']` on band changes; the P2P card shows
-  "Headroom". `load_mult(headroom)` and dormancy of the gate machinery
-  read this meter in Ф10/Ф12.*
-- **Phase 2: sim_mult** — similarity as a multiplier, anchored on
-  deterministic evidence; email-HMAC axis; standing-keyed lanes.
-- **Phase 3: pool reuse** — reuse a task across clients *sufficiently
-  dissimilar* from prior recipients (the metric's third consumer) +
-  use_count/freshness/quality markers. No pre-mining: the N-task rounds
-  and R-audits mint the pool as a by-product, fastest under attack —
-  the attacker capitalizes the defender.
-
-Each phase is useful alone and blocks none after it.
+The mechanism lands in phases — price the gate, then the similarity
+multiplier, then pool reuse — each useful alone and blocking none after
+it. The current phase, its measurements and the arming policy are
+maintainer-private operational notes.
 
 ### The one-line goal
 
@@ -1724,85 +1665,7 @@ data) detectable via gossip — with zero consensus machinery. For the
 MVP, the monotonic `version` field inside each signed record is enough
 replay protection.
 
-## Rollout
+## Rollout and open questions
 
-**Tier 0 — isolation (build first, before any wider sync):**
-
-1. Force `source = 'p2p:' || <sender_node_id>` on every imported row —
-   ignore the payload's source label. On source-keyed tables
-   (`track_stats`, `lyrics`, `artist_bios`, `similar_artists`) this gives
-   first-party-wins for free: peer rows land in their own keyspace and
-   can never overwrite `lastfm`/`mb`/`deezer` rows.
-2. `audio_features` (PK `track_id`) and `embeddings` (PK
-   `track_id, model_id`) have **no source dimension** — `ON CONFLICT DO
-   UPDATE` overwrites regardless. Add an origin guard (is_local flag or
-   skip-if-exists): a locally-derived row is never overwritten by a peer
-   row. Decide per-table.
-3. Per-node purge helper: one `DELETE ... WHERE source = 'p2p:<node_id>'`
-   across all enrichment tables removes a bad actor's entire
-   contribution.
-
-**Tier 1 — verification:** authority re-verify for metadata (MBID/alias
-hints adopted only after owned-album-overlap / MB-dump confirmation;
-structural ops — merge, rename, MBID adoption — are *never* peer-driven)
-+ the recompute ladder for audio-derived data. Requires `pcm_hash` +
-`chromaprint` capture at scan/analysis time and `model_uuid` in the sync
-payload.
-
-**Tier 2 — containment by reversibility:** until verified, peer data may
-touch only reversible surfaces (display bios, recommendation inputs),
-never the canonical identity graph.
-
-**Tier 3 — full trust fabric:** signed record format on the wire,
-quarantine store, flag reports, endorsements, binary acceptance weights.
-
-## Open questions
-
-- Where quarantined records live: staging tables vs. a status column on
-  the target tables (leaning staging — keeps hot-path queries clean).
-- Endorsement propagation format and caps (how many endorsements ride
-  along with a record).
-- `fpcalc`/chromaprint packaging on Windows (launcher bundles it?).
-- Exact cosine threshold per feature family for ladder step 2 — needs a
-  small empirical study across rips/transcodes of known-identical
-  recordings.
-- Whether play stats deserve any verification at all or stay
-  provenance-labeled trust-only.
-- Payment rails for donation receipts (PayPal first? crypto?) and
-  whether amount tiers are public or just "donated: yes".
-- Blind-signature issuance for donation/PoW certificates — unlinking
-  payment identity from node key at the Worker.
-- Scarcity tier (2026-08-14): deposit-hashcash at issuance vs a fully
-  free cert; target mining minutes / T_min / difficulty &
-  params_version raising policy; whether `method: email` certs carry a
-  nominal work bond; peer-side verification budget (semaphore width,
-  pubkey-blacklist TTL). *Primitive + measurements landed 2026-08-16
-  (`desktop/p2p/identity_pow.py`, params v1 = 2 GiB / t=1 / p=1; numbers
-  in the PoW section above). Cert v2 landed 2026-08-17: free cert, no
-  email bond, E=32 golden-age difficulty (see "Certificate v2 wire
-  format"). Still open: T_min, semaphore width, blacklist TTL — chosen
-  with the registry phase.*
-- Admission-gate tuning: K, R, w, quorum M, silver expiry, pool caps;
-  which surfaces get the anonymous compute-priced lane.
-- Defense strategy (2026-08-16): similarity axis weights (measured in
-  phase 0) and the conjunction-scoring function; PI controller gains
-  and the dormancy load threshold; local-standing formula (witnessed
-  age vs karma vs clean-history mix) and reserved-lane budgets; email
-  normalization rules + disposable-domain weighting; Worker-mailbox
-  format (TTL, caps, drain protocol); pool-reuse dissimilarity
-  threshold and use_count/freshness/quality markers; the master
-  support-lane budget and off-master fallback UX.
-- Holdback sizing/rotation for trap issuers — how much computed data a
-  node delays publishing, and for how long.
-- Karma exchange rates (trap batches vs matured authorship vs
-  endorsements) — farming trap batches must never beat contributing
-  fresh data.
-- Auto-quarantine threshold — how many weighted foreign reports flip a
-  key to suspect for nodes that cannot verify themselves.
-- Golden-age mechanics: erosion curve of the golden bonus per validated
-  incident, the optional vote protocol for anchoring the era end on the
-  Worker, thresholds.
-- Signing policy for grey material — is official-MB-release the right
-  default gate? Per-album/per-artist override UX.
-- Whether `embedding_segments` ever sync — if they do, `segment_root` +
-  per-segment Merkle inclusion proofs activate (design ready above).
+Build order, the current tier and the open design questions are tracked
+in the maintainer-private operational notes.
